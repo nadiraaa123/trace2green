@@ -5,13 +5,14 @@ import { adminDb } from "@/lib/firebase/admin";
 import { handleError, requireCaller } from "@/server/http";
 import { createInvite } from "@/server/suppliers";
 
-const schema = z.object({ supplierId: z.string().regex(SUPPLIER_ID_RE) });
+// supplierId given → claim invite for that listed supplier; omitted → connect invite.
+const schema = z.object({ supplierId: z.string().regex(SUPPLIER_ID_RE).nullish() });
 
 export async function POST(req: Request) {
   try {
     const caller = await requireCaller(req);
     const { supplierId } = schema.parse(await req.json());
-    return NextResponse.json(await createInvite(adminDb, caller, supplierId), { status: 201 });
+    return NextResponse.json(await createInvite(adminDb, caller, supplierId ?? null), { status: 201 });
   } catch (err) {
     return handleError(err);
   }

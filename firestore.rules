@@ -34,15 +34,19 @@ service cloud.firestore {
 
     function validActivity(a) {
       return a is map
-        && a.keys().hasOnly(['electricityKwh','fuelLiters','fuelType','packagingKg','packagingMaterial',
+        && a.keys().hasOnly(['electricityKwh','fuelQuantity','fuelUnit','fuelType','packagingKg','packagingMaterial',
                              'wasteKg','wasteHandling','rawMaterialOrigin','transportMode','transportKm',
-                             'efficiencyPractice'])
-        && optNum(a,'electricityKwh') && optNum(a,'fuelLiters') && optNum(a,'packagingKg')
+                             'efficiencyPractice','notApplicable'])
+        && optNum(a,'electricityKwh') && optNum(a,'fuelQuantity') && optNum(a,'packagingKg')
         && optNum(a,'wasteKg') && optNum(a,'transportKm')
-        && optStr(a,'fuelType',40) && optStr(a,'packagingMaterial',80) && optStr(a,'wasteHandling',80)
+        && optStr(a,'packagingMaterial',80) && optStr(a,'wasteHandling',80)
+        && (!('fuelUnit' in a) || a.fuelUnit in [null,'liter','kg'])
+        && (!('fuelType' in a) || a.fuelType in [null,'Bensin','Solar','LPG','Lainnya'])
         && (!('rawMaterialOrigin' in a) || a.rawMaterialOrigin in [null,'Lokal','Regional','Impor'])
         && (!('transportMode' in a) || a.transportMode in [null,'Motor','Mobil bak','Truk'])
-        && (!('efficiencyPractice' in a) || a.efficiencyPractice in [null,'Belum','Sebagian','Sudah ada']);
+        && (!('efficiencyPractice' in a) || a.efficiencyPractice in [null,'Belum','Sebagian','Sudah ada'])
+        && (!('notApplicable' in a) || (a.notApplicable is list && a.notApplicable.size() <= 5
+             && a.notApplicable.hasOnly(['listrik','bbm','kemasan','limbah','transportasi'])));
     }
     function validProfile(p) {
       return p is map
@@ -140,13 +144,18 @@ service cloud.firestore {
       allow create: if isSupplierOf(request.resource.data.supplierId)
         && idOwner(request.resource.data.reportId) == request.resource.data.supplierId
         && request.resource.data.keys().hasOnly(['supplierId','reportId','kind','fileName','mimeType','sizeBytes',
-                                                 'storageMode','declaredKwh','sharedWith','dataSource','isSimulated','createdAt'])
+                                                 'storageMode','sharedWith','dataSource','isSimulated','createdAt'])
+        && request.resource.data.fileName is string && request.resource.data.fileName.size() <= 200
+        && request.resource.data.mimeType in ['image/jpeg','image/png','image/webp','image/heic','application/pdf']
+        && exists(/databases/$(database)/documents/monthly_reports/$(request.resource.data.reportId))
+        && get(/databases/$(database)/documents/monthly_reports/$(request.resource.data.reportId)).data.status in ['draft','revision_requested']
         && request.resource.data.kind in ['tagihan_listrik','nota_bbm','bukti_material','lainnya']
-        && request.resource.data.storageMode in ['demo_preview','firestore_inline']
+        // Clients may only record demo previews; real storage is written by the server later.
+        && request.resource.data.storageMode == 'demo_preview'
         && request.resource.data.sharedWith.size() == 0
         && request.resource.data.isSimulated == false
-        && request.resource.data.sizeBytes is int && request.resource.data.sizeBytes <= 5242880
-        && optNum(request.resource.data, 'declaredKwh');
+        && request.resource.data.sizeBytes is int && request.resource.data.sizeBytes > 0
+        && request.resource.data.sizeBytes <= 5242880;
       allow delete: if ownsDoc(resource.data) && resource.data.sharedWith.size() == 0;
       allow update: if false;
     }

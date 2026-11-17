@@ -16,5 +16,7 @@ async function main() {
   await b.commit();
   const { code } = await createInvite(db, { uid: "fixture", email: null, claims: { role: "company_admin", companyId: "CMP-A" } }, "SUP-002");
   console.log(`INVITE=${code}`);
+  const connect = await createInvite(db, { uid: "fixture", email: null, claims: { role: "company_admin", companyId: "CMP-A" } }, null);
+  console.log(`CONNECT=${connect.code}`);
 }
 main().then(() => process.exit(0));

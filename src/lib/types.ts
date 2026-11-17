@@ -76,11 +76,15 @@ export interface ConsentDoc extends BaseDoc {
   revokedAt: unknown | null;
 }
 
-/** All fields optional + nullable: missing must stay missing, never zero. */
+/**
+ * All fields nullable: null = not answered (missing), never coerced to zero.
+ * A category the supplier explicitly does not use goes in `notApplicable`.
+ */
 export interface ActivityData {
   electricityKwh: number | null;
-  fuelLiters: number | null;
-  fuelType: string | null;
+  fuelQuantity: number | null;
+  fuelUnit: "liter" | "kg" | null;
+  fuelType: "Bensin" | "Solar" | "LPG" | "Lainnya" | null;
   packagingKg: number | null;
   packagingMaterial: string | null;
   wasteKg: number | null;
@@ -89,6 +93,7 @@ export interface ActivityData {
   transportMode: "Motor" | "Mobil bak" | "Truk" | null;
   transportKm: number | null;
   efficiencyPractice: "Belum" | "Sebagian" | "Sudah ada" | null;
+  notApplicable: ActivityCategory[];
 }
 
 export interface ReportProfile {
@@ -111,4 +116,49 @@ export interface MonthlyReportDoc extends BaseDoc {
   version: number;
   sharedWith: string[];
   submittedAt: unknown | null;
+}
+
+export type EvidenceKind = "tagihan_listrik" | "nota_bbm" | "bukti_material" | "lainnya";
+/**
+ * demo_preview: file is only previewed in the browser, never uploaded or kept.
+ * object_storage: reserved for a future private bucket (written by the server only).
+ */
+export type EvidenceStorageMode = "demo_preview" | "object_storage";
+
+export interface EvidenceMetadataDoc {
+  supplierId: string;
+  reportId: string;
+  kind: EvidenceKind;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageMode: EvidenceStorageMode;
+  sharedWith: string[];
+  dataSource: DataSource;
+  isSimulated: boolean;
+  createdAt: unknown;
+}
+
+/** Append-only status history (supplier and reviewer actions). */
+export interface VerificationRecordDoc {
+  reportId: string;
+  supplierId: string;
+  action:
+    | "submitted"
+    | "resubmitted"
+    | "supplier_correction_request"
+    | "approve"
+    | "request_revision"
+    | "reject"
+    | "sample_audit";
+  fromStatus: ReportStatus | null;
+  toStatus: ReportStatus | null;
+  actorUid: string | null;
+  actorRole: Role | "system";
+  note: string | null;
+  version: number | null;
+  sharedWith: string[];
+  dataSource: DataSource;
+  isSimulated: boolean;
+  createdAt: unknown;
 }

@@ -148,6 +148,9 @@ export async function claimSupplier(
     const [inviteSnap, userSnap] = await Promise.all([tx.get(inviteRef), tx.get(userRef)]);
     if (!inviteSnap.exists) throw new AppError("invite_invalid", "Kode undangan tidak ditemukan.", 404);
     const invite = inviteSnap.data()!;
+    if (!invite.supplierId) {
+      throw new AppError("invite_wrong_type", "Kode ini untuk menghubungkan usaha yang sudah terdaftar. Daftar sebagai usaha baru, lalu masukkan kode di menu Perusahaan Terhubung.", 400);
+    }
     if (invite.usedByUid) throw new AppError("invite_used", "Kode undangan sudah dipakai.", 409);
     if ((invite.expiresAt as Timestamp).toMillis() < Date.now()) {
       throw new AppError("invite_expired", "Kode undangan sudah kedaluwarsa.", 410);
@@ -205,30 +208,39 @@ export function generateInviteCode() {
   return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("");
 }
 
-/** Company admin issues a single-use code for a supplier it is related to. */
+/**
+ * Company admin issues a single-use code.
+ * - With supplierId: "claim" invite for an existing (listed/seeded) unclaimed supplier.
+ * - Without supplierId: "connect" invite a self-registered supplier enters to link to the company.
+ */
 export async function createInvite(
   db: Firestore,
   caller: Caller,
-  supplierId: string,
+  supplierId: string | null,
   ttlDays = 14,
 ) {
   const companyId = caller.claims.companyId as string | undefined;
   if (caller.claims.role !== "company_admin" || !companyId) {
     throw new AppError("forbidden", "Hanya admin perusahaan yang dapat membuat undangan.", 403);
   }
-  const rel = await db.doc(`company_supplier_relationships/${companyId}_${supplierId}`).get();
-  if (!rel.exists) throw new AppError("not_related", "Pemasok ini tidak terhubung dengan perusahaan Anda.", 403);
-  const supplier = await db.doc(`suppliers/${supplierId}`).get();
-  if (supplier.data()?.ownerUid) throw new AppError("already_claimed", "Profil pemasok ini sudah diklaim.", 409);
+  if (supplierId) {
+    const rel = await db.doc(`company_supplier_relationships/${companyId}_${supplierId}`).get();
+    if (!rel.exists) throw new AppError("not_related", "Pemasok ini tidak terhubung dengan perusahaan Anda.", 403);
+    const supplier = await db.doc(`suppliers/${supplierId}`).get();
+    if (supplier.data()?.ownerUid) throw new AppError("already_claimed", "Profil pemasok ini sudah diklaim.", 409);
+  }
+  const company = await db.doc(`companies/${companyId}`).get();
 
   const code = generateInviteCode();
   await db.doc(`supplier_invites/${hashInvite(code)}`).create({
-    supplierId,
+    type: supplierId ? "claim" : "connect",
+    supplierId: supplierId ?? null,
     companyId,
+    companyName: (company.data()?.name as string | undefined) ?? companyId,
     createdByUid: caller.uid,
     expiresAt: Timestamp.fromMillis(Date.now() + ttlDays * 86_400_000),
     usedByUid: null,
     createdAt: FieldValue.serverTimestamp(),
   });
-  return { code, supplierId, expiresInDays: ttlDays };
+  return { code, supplierId: supplierId ?? null, type: supplierId ? "claim" : "connect", expiresInDays: ttlDays };
 }

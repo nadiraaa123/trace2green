@@ -24,9 +24,9 @@ const PROJECT = "demo-trace2green";
 let env: RulesTestEnvironment;
 
 const emptyActivity = {
-  electricityKwh: null, fuelLiters: null, fuelType: null, packagingKg: null, packagingMaterial: null,
+  electricityKwh: null, fuelQuantity: null, fuelUnit: null, fuelType: null, packagingKg: null, packagingMaterial: null,
   wasteKg: null, wasteHandling: null, rawMaterialOrigin: null, transportMode: null, transportKm: null,
-  efficiencyPractice: null,
+  efficiencyPractice: null, notApplicable: [],
 };
 const emptyProfile = {
   businessName: null, sector: null, mainProduct: null, productionVolume: null, productionUnit: null, employees: null,
@@ -186,5 +186,50 @@ describe("unauthorized users and seeded profiles", () => {
     await assertSucceeds(updateDoc(doc(sup1(), "notifications/n1"), { read: true }));
     await assertFails(updateDoc(doc(sup1(), "notifications/n1"), { title: "hacked" }));
     await assertFails(getDoc(doc(sup51(), "notifications/n1")));
+  });
+});
+
+describe("Phase 2: evidence metadata and not-applicable categories", () => {
+  const ev = (over: Record<string, unknown> = {}) => ({
+    supplierId: "SUP-001", reportId: "SUP-001_2027-04", kind: "tagihan_listrik", fileName: "tagihan.jpg",
+    mimeType: "image/jpeg", sizeBytes: 120000, storageMode: "demo_preview", sharedWith: [],
+    dataSource: "trial", isSimulated: false, createdAt: serverTimestamp(), ...over,
+  });
+  it("supplier records demo-preview metadata for its own editable draft", async () => {
+    const db = sup1();
+    await assertSucceeds(setDoc(doc(db, "monthly_reports/SUP-001_2027-04"), draft("SUP-001", "2027-04")));
+    await assertSucceeds(setDoc(doc(db, "evidence_metadata/e1"), ev()));
+  });
+  it("rejects file bytes, fake storage modes, shared or oversized evidence, and locked reports", async () => {
+    const db = sup1();
+    await assertSucceeds(setDoc(doc(db, "monthly_reports/SUP-001_2027-04"), draft("SUP-001", "2027-04")));
+    await assertFails(setDoc(doc(db, "evidence_metadata/e2"), ev({ storageMode: "object_storage" })));
+    await assertFails(setDoc(doc(db, "evidence_metadata/e3"), ev({ storageMode: "firestore_inline" })));
+    await assertFails(setDoc(doc(db, "evidence_metadata/e4"), ev({ dataBase64: "AAAA" })));
+    await assertFails(setDoc(doc(db, "evidence_metadata/e5"), ev({ sharedWith: ["CMP-A"] })));
+    await assertFails(setDoc(doc(db, "evidence_metadata/e6"), ev({ sizeBytes: 6 * 1024 * 1024 })));
+    await assertFails(setDoc(doc(db, "evidence_metadata/e7"), ev({ mimeType: "text/html" })));
+    // SUP-001_2027-01 is verified: no new evidence can be attached
+    await assertFails(setDoc(doc(db, "evidence_metadata/e8"), ev({ reportId: "SUP-001_2027-01" })));
+    // other supplier's report
+    await assertFails(setDoc(doc(sup51(), "evidence_metadata/e9"), ev({ supplierId: "SUP-051" })));
+  });
+  it("notApplicable accepts known categories only", async () => {
+    const db = sup1();
+    await assertSucceeds(setDoc(doc(db, "monthly_reports/SUP-001_2027-04"),
+      draft("SUP-001", "2027-04", { activity: { ...emptyActivity, notApplicable: ["bbm", "transportasi"] } })));
+    await assertFails(setDoc(doc(db, "monthly_reports/SUP-001_2027-05"),
+      draft("SUP-001", "2027-05", { activity: { ...emptyActivity, notApplicable: ["semua"] } })));
+    await assertFails(setDoc(doc(db, "monthly_reports/SUP-001_2027-05"),
+      draft("SUP-001", "2027-05", { activity: { ...emptyActivity, fuelUnit: "galon" } })));
+  });
+  it("a report under revision stays editable; a submitted one does not", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "monthly_reports/SUP-001_2027-02"), { ...draft("SUP-001", "2027-02"), status: "revision_requested", sharedWith: ["CMP-A"] });
+      await setDoc(doc(ctx.firestore(), "monthly_reports/SUP-001_2027-03"), { ...draft("SUP-001", "2027-03"), status: "submitted", sharedWith: ["CMP-A"] });
+    });
+    await assertSucceeds(updateDoc(doc(sup1(), "monthly_reports/SUP-001_2027-02"), { activity: { ...emptyActivity, electricityKwh: 300 } }));
+    await assertFails(updateDoc(doc(sup1(), "monthly_reports/SUP-001_2027-03"), { activity: { ...emptyActivity, electricityKwh: 300 } }));
+    await assertFails(deleteDoc(doc(sup1(), "monthly_reports/SUP-001_2027-02")));
   });
 });

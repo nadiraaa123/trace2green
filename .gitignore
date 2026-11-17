@@ -40,3 +40,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# firebase / credentials — never commit
+*service-account*.json
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+credentials*.json
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+database-debug.log*
+.firebase/
+.runtimeconfig.json
+
+# test artifacts
+test-results/
+playwright-report/

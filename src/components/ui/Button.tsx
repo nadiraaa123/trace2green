@@ -23,7 +23,7 @@ export function Button({
       {...props}
       disabled={disabled || loading}
       className={clsx(
-        "inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold transition",
+        "inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 text-sm font-semibold transition",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
         "disabled:cursor-not-allowed disabled:opacity-60",
         styles[variant],

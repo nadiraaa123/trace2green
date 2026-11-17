@@ -1,6 +1,6 @@
 # Trace2Green — Architecture & Implementation Plan
 
-Status: Phase 1 (Foundation) implemented and tested against the Firebase Emulator Suite.
+Status: Phases 1–2 (Foundation, Supplier Portal) implemented and tested against the Firebase Emulator Suite.
 No real Firebase project is connected yet (see "Credentials needed").
 
 ---
@@ -58,7 +58,7 @@ Every business document carries `dataSource: "demo" | "trial" | "production"`,
 | `company_supplier_relationships` | `{companyId}_{supplierId}` | companyId, supplierId, isCritical, status | server/seed |
 | `supplier_data_sharing_consents` | `{companyId}_{supplierId}` | granted, grantedAt, grantedByUid, method (`seed_simulated` / `supplier_in_app`) | server |
 | `supplier_invites` | sha256(code) | supplierId, companyId, expiresAt, usedByUid | server |
-| `monthly_reports` | `{supplierId}_{YYYY-MM}` | supplierId, period, status, profile{}, activity{}, sharedWith[], version, submittedAt | owner (draft only) + server |
+| `monthly_reports` | `{supplierId}_{YYYY-MM}` | supplierId, period, status, profile{}, activity{} (nullable values + `notApplicable[]`, `fuelQuantity`+`fuelUnit`), sharedWith[], version, submittedAt, missingFields[] | owner (draft/revision only) + server |
 | `monthly_reports/{id}/versions` | `v{n}` | immutable snapshot of each submission | server |
 | `activity_records` | `{reportId}_{category}` | category, quantity, unit, missing flag, sharedWith[] | server |
 | `emission_factors` | `{category}_{validFrom}` | category, unit, kgCO2ePerUnit, status (`simulated`/`verified`), source, validFrom, validTo | server/seed |
@@ -118,18 +118,24 @@ Verified totals: **100 suppliers, 2 buyers (50/50), 277 report rows
 
 Blank cells stay `null`. Nothing is back-filled.
 
-### Mapping decisions you should confirm
-1. **Report status of seeded rows.** The workbook has no explicit report status.
-   Proposed: evidence `Cocok` → `verified` (layer-2 check), `Tidak cocok` →
-   `revision_requested`, `Belum ada bukti` → `submitted` (awaiting evidence).
-   This labels 210 rows "verified" on the basis of a simulated bill match.
-2. **Workbook treats blanks as zero** in emissions (e.g. SUP-001 Jan has no BBM →
-   0 kg). Imported values are preserved as simulated, but the live engine will
-   flag such categories as *missing*, so a re-calculated score can differ from
-   the workbook score for the same row. The UI shows which engine produced it.
-3. **The benchmark is self-referential.** "Rata-rata kelompok" is the mean of the
-   simulated rows for each sector over all three months. It is not an industry
-   benchmark. Live scores using it are labeled `provisional`.
+### Confirmed import decisions (applied in Phase 3)
+1. All 100 suppliers, 277 report rows and 12 audit rows are imported unchanged as
+   `dataSource: "demo"`, `isSimulated: true`.
+2. The workbook's evidence result ("Cocok" / "Tidak cocok" / "Belum ada bukti")
+   is stored in a separate `workbook.evidenceStatus` field. It is **not** a
+   verification status. Seeded reports never get `status: "verified"`
+   automatically; the audit rows become `verification_records` with
+   `action: "sample_audit"` and `isSimulated: true`.
+3. Workbook emissions/scores are kept as `calcSource: "workbook_simulated"` for
+   reference. New reports use the corrected engine: missing stays missing,
+   no invented factors or benchmarks; scores without a valid benchmark are
+   `provisional` or not scored.
+4. Workbook "Q4 BBM (liter/bulan)" maps to `fuelQuantity` + `fuelUnit: "liter"`,
+   `fuelType: null` (the workbook does not record the fuel type).
+
+Open question for Phase 3: which workflow status seeded rows get (proposal:
+`submitted` with a dashboard filter so 277 demo rows don't flood the live
+verification queue).
 
 ## 4. Screen / page map
 
@@ -158,19 +164,21 @@ Platform admin — `/admin` (provisioning status, seed status, sync logs)
 | 1 MiB per document | Constrains inline evidence | Compress images client-side to ≤ 500 KB |
 | Rules can't join | Isolation needs denormalized `sharedWith` | Server maintains it on consent change |
 
-**Evidence storage decision (needs your call):**
-- (a) Recommended: compressed image stored in a separate Firestore doc
-  (`evidence_files`), same rules as its report. Free, private, actually persists.
-  Limits: ~500 KB per photo, reads count against quota, not a long-term design.
-- (b) Metadata-only demo preview, clearly labeled "tidak tersimpan permanen".
-- (c) Enable Blaze for Cloud Storage (has a free allowance, but needs billing).
+**Evidence storage (decided):** Firestore holds metadata only
+(`evidence_metadata`). File bytes go through the `EvidenceStorage` interface in
+`src/lib/evidence/storage.ts`. The only implementation today is
+`DemoPreviewStorage`: the file is previewed in the browser and never uploaded.
+Rules allow clients to write `storageMode: "demo_preview"` only; the UI labels
+every item "Pratinjau demo · tidak tersimpan". A future private bucket would add
+an implementation returning `storageMode: "object_storage"` via a server-issued
+signed upload, without changing the wizard.
 
 ## 6. Step-by-step plan
 
 | Phase | Deliverable | Test gate |
 |---|---|---|
-| 1 Foundation | Project, design tokens, Firebase client/admin, schema types, rules, indexes, supplier registration (idempotent), company provisioning script, claim-by-invite, login + role routing | Rules unit tests + registration/claim integration tests on emulator |
-| 2 Supplier portal | Home, profile, 4-step wizard, drafts, submit route, status timeline | Wizard e2e (Playwright) on emulator |
+| 1 Foundation ✅ | Project, design tokens, Firebase client/admin, schema types, rules, indexes, supplier registration (idempotent), company provisioning script, claim-by-invite, login + role routing | Rules unit tests + registration/claim integration tests on emulator |
+| 2 Supplier portal ✅ | Home, profile, 4-step wizard, autosave drafts, submit/correction routes, history, consent + connect code | 76 unit/rules/server tests + 26-step browser e2e + DB assertions |
 | 3 Data processing | Idempotent seed, emission engine, scoring engine, verification workflow | Seed checksum vs Rekap; engine unit tests reproduce workbook scores |
 | 4 Company dashboard | All 8 menus on real listeners, CSV export | Real-time test: submit on one browser, appears in another |
 | 5 Analytics | Sheets upsert sync + logs + manual resync, Looker docs | Needs Google credentials |

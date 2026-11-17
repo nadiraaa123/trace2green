@@ -10,7 +10,7 @@
     "test": "firebase emulators:exec --project demo-trace2green --only firestore,auth \"vitest run\"",
     "emulators": "firebase emulators:start --project demo-trace2green --only firestore,auth",
     "provision": "tsx scripts/provision.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test:e2e": "NEXT_PUBLIC_REPORTING_REFERENCE_DATE=2027-04-05 next build && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run.sh && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-phase3.sh && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-phase4.sh",
     "seed": "tsx scripts/seed.ts"
   },
@@ -45,5 +45,8 @@
   "overrides": {
     "@firebase/app-compat": "0.5.18",
     "@firebase/app": "0.16.2"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

@@ -5,8 +5,13 @@ import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 
 const useEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true";
 
+/** False when the deployment has no Firebase web config (e.g. Vercel env vars not set yet). */
+export const firebaseConfigured = useEmulator || !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
 const config: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || (useEmulator ? "demo-key" : undefined),
+  // A placeholder keeps getAuth() from throwing at import/prerender time when the
+  // config is missing; every call then fails at runtime and the UI shows a notice.
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || (useEmulator ? "demo-key" : "firebase-config-missing"),
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "demo-trace2green",
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,

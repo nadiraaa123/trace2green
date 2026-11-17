@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
-import { adminAuth } from "@/lib/firebase/admin";
+import { getAdminAuth } from "@/lib/firebase/admin";
 import { AppError } from "./suppliers";
 
 /** Verifies the Firebase ID token from `Authorization: Bearer <token>`. */
@@ -10,7 +10,7 @@ export async function requireCaller(req: Request) {
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token) throw new AppError("unauthenticated", "Silakan masuk terlebih dahulu.", 401);
   try {
-    const decoded = await adminAuth.verifyIdToken(token, true);
+    const decoded = await getAdminAuth().verifyIdToken(token, true);
     const { uid, email, ...claims } = decoded;
     return { uid, email: email ?? null, claims: claims as Record<string, unknown> };
   } catch {

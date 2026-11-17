@@ -72,3 +72,11 @@ The cron in `vercel.json` (daily 01:17 UTC) is within Hobby limits.
   per company.
 - Sheets API free quota (300 requests/min per project) is far above one sync
   (~4 requests per changed tab).
+
+## Runtime compatibility note
+The Vercel function runtime does not allow `require()` of ES modules. firebase-admin
+14 loads `jwks-rsa`, which `require()`s `jose`; jose 6 is ESM-only. `package.json`
+therefore overrides **only** `jwks-rsa`'s jose to 5.10.0 (CommonJS build, same
+`importJWK`/`exportSPKI` API). `tests/runtime-compat.test.ts` and the e2e servers run
+with `--no-experimental-require-module` to catch regressions. Remove the override once
+jwks-rsa ships an ESM-safe release.

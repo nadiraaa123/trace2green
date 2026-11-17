@@ -45,7 +45,10 @@
   },
   "overrides": {
     "@firebase/app-compat": "0.5.18",
-    "@firebase/app": "0.16.2"
+    "@firebase/app": "0.16.2",
+    "jwks-rsa": {
+      "jose": "5.10.0"
+    }
   },
   "engines": {
     "node": "24.x"

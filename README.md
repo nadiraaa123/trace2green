@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Trace2Green
 
-## Getting Started
+B2B platform for collecting, verifying, scoring and monitoring environmental
+activity data from SME/UMKM suppliers. Competition MVP (The 21st Management
+E[X]POSED BPC 2026). All seeded data is **simulated**.
 
-First, run the development server:
+Architecture, schema, import mapping, page map and free-tier limits:
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Local development (no Firebase project needed)
+
+Requires Node 20+ and Java 11+ (for the Firebase emulators).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run emulators            # terminal 1: Auth + Firestore emulators
+npm run dev                  # terminal 2: http://localhost:3000 (uses .env.local)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create a company admin on the emulator:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+  npm run provision -- company CMP-A "Perusahaan Mitra A" admin@mitra-a.test rahasia123 demo
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tests
 
-## Learn More
+```bash
+npm test          # security rules + identity integration tests (emulator)
+npm run test:e2e  # production build + browser test of the auth flows (emulator)
+npm run typecheck
+npm run lint
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Status
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Phase | State |
+|---|---|
+| 1 Foundation (auth, roles, rules, identity) | Done, tested on emulator |
+| 2 Supplier portal | Not started |
+| 3 Seed, emissions, scoring, verification | Not started |
+| 4 Company dashboard | Not started |
+| 5 Sheets / Looker Studio | Not started — needs Google credentials |
+| 6 QA + Vercel deploy | Not started — needs Firebase + Vercel projects |

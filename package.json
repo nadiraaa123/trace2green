@@ -6,21 +6,43 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "firebase emulators:exec --project demo-trace2green --only firestore,auth \"vitest run\"",
+    "emulators": "firebase emulators:start --project demo-trace2green --only firestore,auth",
+    "provision": "tsx scripts/provision.ts",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "next build && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-phase1.sh"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "clsx": "^2.1.1",
+    "firebase": "^12.19.0",
+    "firebase-admin": "^14.5.1",
+    "lucide-react": "^1.74.0",
     "next": "16.4.6",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "recharts": "^3.10.1",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/turbopack": "4.3.3",
-    "@types/node": "^20",
+    "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "firebase-tools": "^15.36.0",
     "tailwindcss": "4.3.3",
-    "typescript": "^5"
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "overrides": {
+    "@firebase/app-compat": "0.5.18",
+    "@firebase/app": "0.16.2"
   }
 }

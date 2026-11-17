@@ -16,8 +16,7 @@ not certified carbon accounting and not a guarantee of PSPK compliance.
 | 2 Supplier portal (home, profile, wizard, drafts, submission, history, consent) | ✅ tested on emulator |
 | 3 Workbook seed, emissions, scoring, verification | ✅ tested on emulator |
 | 4 Company dashboard (8 menus, filters Semua/Simulasi/Trial, company-scoped verification) | ✅ tested on emulator |
-| 5 Google Sheets / Looker Studio | not started (needs Google credentials) |
-| 6 QA + Vercel deploy | not started (needs Firebase + Vercel projects) |
+| 5 Google Sheets sync, Looker datasets, deployment config | ✅ code + tests; needs your credentials ([`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md), [`docs/LOOKER_STUDIO.md`](docs/LOOKER_STUDIO.md)) |
 
 Scores: live reports show each component's status; a final score appears only when completeness, evidence and intensity are all available. No industry benchmark exists yet, so live reports have no final score (see ARCHITECTURE §7).
 
@@ -26,7 +25,7 @@ records metadata (name, type, size). See ARCHITECTURE §5.
 
 ## Prerequisites
 
-- Node.js 20+ and npm
+- Node.js 24 (see `.nvmrc`; `engines.node` is 24.x) and npm
 - Java 11+ (Firebase emulators)
 - Chromium for browser tests (`npx playwright install chromium` if you don't have one)
 

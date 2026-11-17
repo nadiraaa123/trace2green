@@ -290,3 +290,20 @@ describe("Phase 4: company summaries and company-scoped reviews", () => {
     await assertFails(setDoc(doc(reviewer, "company_period_stats/CMP-A_2027-03"), { companyId: "CMP-A", rows: [] }));
   });
 });
+
+describe("Phase 5: Google Sheets sync status and logs", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sheets_sync/CMP-A"), { companyId: "CMP-A", lastStatus: "ok" });
+      await setDoc(doc(ctx.firestore(), "sync_logs/l1"), { companyId: "CMP-A", status: "ok" });
+    });
+  });
+  it("a company reads only its own sync status; logs are admin-only; nobody writes", async () => {
+    await assertSucceeds(getDoc(doc(companyA(), "sheets_sync/CMP-A")));
+    await assertFails(getDoc(doc(companyB(), "sheets_sync/CMP-A")));
+    await assertFails(getDoc(doc(sup1(), "sheets_sync/CMP-A")));
+    await assertFails(getDocs(collection(companyA(), "sheets_sync")));
+    await assertFails(setDoc(doc(companyA(), "sheets_sync/CMP-A"), { lastStatus: "ok" }));
+    await assertFails(getDoc(doc(companyA(), "sync_logs/l1")));
+  });
+});

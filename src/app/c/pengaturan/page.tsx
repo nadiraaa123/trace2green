@@ -1,5 +1,5 @@
 "use client";
-import { Copy, KeyRound, RefreshCw } from "lucide-react";
+import { Copy, KeyRound, RefreshCw, Sheet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useCompany } from "@/components/company/CompanyContext";
@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Field";
 import { auth } from "@/lib/firebase/client";
 import { apiPost, authErrorMessage } from "@/lib/api";
+import { formatDateTime } from "@/lib/supplier-data";
+import { useDoc } from "@/lib/useDoc";
 
 interface Invite { type: "claim" | "connect"; supplierId: string | null; createdAt: string | null; expiresAt: string | null; used: boolean }
 interface User { email: string; displayName: string; role: string; canVerify: boolean }
@@ -32,6 +34,7 @@ export default function SettingsPage() {
   const [claimFor, setClaimFor] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const { data: sync } = useDoc<{ lastStatus?: string; lastError?: string | null; lastSyncAt?: unknown; rows?: Record<string, number> }>(`sheets_sync/${c.companyId}`);
 
   const load = useCallback(() => {
     apiGet<{ invites: Invite[] }>("/api/companies/invites").then((r) => setInvites(r.invites)).catch(() => setInvites([]));
@@ -50,6 +53,15 @@ export default function SettingsPage() {
     setMsg(null); setBusy("refresh");
     try { const r = await apiPost<{ summariesWritten: number }>("/api/companies/stats/refresh", {}); setMsg({ tone: "success", text: `Ringkasan diperbarui (${r.summariesWritten} dokumen berubah).` }); }
     catch (e) { setMsg({ tone: "error", text: authErrorMessage(e) }); } finally { setBusy(null); }
+  }
+
+  async function syncSheets() {
+    setMsg(null); setBusy("sheets");
+    try {
+      const r = await apiPost<{ results: { status: string; tabsWritten: string[]; error?: string }[] }>("/api/sync/sheets", {});
+      const x = r.results[0];
+      setMsg(x.status === "ok" ? { tone: "success", text: `Sinkronisasi selesai: ${x.tabsWritten.length} tab diperbarui.` } : { tone: "error", text: `Sinkronisasi gagal: ${x.error}` });
+    } catch (e) { setMsg({ tone: "error", text: authErrorMessage(e) }); } finally { setBusy(null); }
   }
 
   const consent = { yes: rows.filter((r) => r.consent), no: rows.filter((r) => !r.consent) };
@@ -112,6 +124,16 @@ export default function SettingsPage() {
           <p className="mt-2 text-[11px] text-navy-500">Hak akses Anda saat ini: {claims.canVerify ? "dapat memutuskan verifikasi" : "hanya melihat"}.</p>
         </Panel>
       </div>
+
+      <Panel title="Google Sheets & Looker Studio" subtitle="Salinan analitik untuk Looker Studio. Dasbor ini tetap real-time; Looker Studio dapat tertunda." className="mt-5">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <Sheet className="size-5 text-brand-600" />
+          <span>Sinkronisasi terakhir: <b>{sync?.lastSyncAt ? formatDateTime(sync.lastSyncAt) : "belum pernah"}</b></span>
+          {sync?.lastStatus === "error" && <span className="text-risk">Gagal: {sync.lastError}</span>}
+          <Button variant="secondary" onClick={syncSheets} loading={busy === "sheets"} className="h-10">Sinkronkan sekarang</Button>
+        </div>
+        <p className="mt-2 text-[11px] text-navy-500">Spreadsheet khusus perusahaan Anda; hanya berisi data yang dibagikan pemasok kepada Anda. Sinkronisasi otomatis berjalan sekali sehari.</p>
+      </Panel>
 
       <Panel title="Pemasok Terhubung & Izin Berbagi Data" subtitle="Pemasok mengatur izin sendiri; perusahaan hanya melihat statusnya" className="mt-5">
         <p className="mb-3 text-sm text-navy-700">{consent.yes.length} mengizinkan · {consent.no.length} belum mengizinkan · total {rows.length} pemasok terhubung</p>

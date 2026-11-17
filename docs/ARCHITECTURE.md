@@ -1,6 +1,6 @@
 # Trace2Green — Architecture & Implementation Plan
 
-Status: Phases 1–4 (Foundation, Supplier Portal, Data Processing, Company Dashboard) implemented and tested against the Firebase Emulator Suite.
+Status: Phases 1–5 (… Company Dashboard, Sheets sync & deployment config) implemented and tested against the Firebase Emulator Suite.
 No real Firebase project is connected yet (see "Credentials needed").
 
 ---
@@ -292,6 +292,17 @@ labels it as simulated and not an official industry benchmark. Default: off.
 **Drafts.** Companies see only that a draft exists (for suppliers who granted
 consent), never its contents; supplier-facing copy states this. Drafts are
 created and deleted through `/api/reports/draft*` so summaries stay current.
+
+## 9. Google Sheets sync & deployment (Phase 5)
+`src/server/sheets.ts`: one spreadsheet per company (`SHEETS_SPREADSHEET_IDS`);
+datasets built only from data the company may read (its summaries, reports shared
+with it, its own reviews, audits shared with it); each tab fully rewritten, skipped
+when its content hash is unchanged; every run logged in `sync_logs`, status in
+`sheets_sync/{companyId}` (company may read its own). Triggers: manual
+(`POST /api/sync/sheets`, admins; company admins only their own company) and daily
+Vercel Cron (`/api/sync/sheets/cron`, `CRON_SECRET`). Looker Studio field mapping:
+`docs/LOOKER_STUDIO.md`. Setup: `docs/DEPLOYMENT.md`. Firebase Admin and client
+SDKs initialise lazily so builds succeed without credentials; Node 24.x.
 
 ## Credentials needed (not available in this session)
 - Firebase project (Spark): web config + a service account key for `firebase-admin`.

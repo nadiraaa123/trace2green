@@ -21,6 +21,7 @@ export const STATUS_LABEL: Record<ReportStatus, string> = {
   revision_requested: "Perlu Perbaikan",
   verified: "Terverifikasi",
   rejected: "Ditolak",
+  imported_simulated: "Data Simulasi",
 };
 
 /** Fields a supplier may write directly while a report is still editable. */

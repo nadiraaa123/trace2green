@@ -134,9 +134,15 @@ service cloud.firestore {
 
     // Server-computed, read-only for clients.
     match /activity_records/{id}      { allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
-    match /emission_results/{id}      { allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
-    match /supplier_scores/{id}       { allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
-    match /recommendations/{id}       { allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
+    match /emission_results/{id}      { allow get: if isSupplierOf(idOwner(id)); allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
+    match /supplier_scores/{id} {
+      allow get: if isSupplierOf(idOwner(id));
+      allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin();
+      allow write: if false;
+      // Immutable score history (one doc per calculation).
+      match /versions/{v} { allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
+    }
+    match /recommendations/{id}      { allow get: if isSupplierOf(idOwner(id)); allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
     match /verification_records/{id}  { allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
 
     match /evidence_metadata/{id} {

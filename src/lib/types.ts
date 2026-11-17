@@ -8,7 +8,9 @@ export type ReportStatus =
   | "submitted" // Menunggu Verifikasi
   | "revision_requested"
   | "verified"
-  | "rejected";
+  | "rejected"
+  // Seeded workbook rows: outside the verification workflow. Never "verified".
+  | "imported_simulated";
 
 export type ScoreColor = "HIJAU" | "KUNING" | "MERAH";
 export type ScoreType = "simulated" | "provisional" | "verified";

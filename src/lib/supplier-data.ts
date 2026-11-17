@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { db } from "@/lib/firebase/client";
 import type { ConsentDoc, EvidenceMetadataDoc, MonthlyReportDoc, RelationshipDoc, SupplierDoc, VerificationRecordDoc } from "@/lib/types";
 import { useDoc } from "@/lib/useDoc";
+import type { EmissionView, ScoreView } from "@/components/results/Breakdown";
 
 type Row<T> = T & { id: string };
 export interface ListState<T> { rows: Row<T>[]; loading: boolean; error: string | null }
@@ -61,10 +62,11 @@ export function useEvidence(reportId: string) {
   return useQuery<EvidenceMetadataDoc>("evidence_metadata", sid ? [where("supplierId", "==", sid), where("reportId", "==", reportId)] : null, [sid, reportId]);
 }
 
-export interface ScoreDoc {
-  supplierId: string; period: string; final: number | null; color: "HIJAU" | "KUNING" | "MERAH" | null;
-  scoreType: "simulated" | "provisional" | "verified";
-  completeness?: number | null; evidence?: number | null; intensity?: number | null;
+export type ScoreDoc = ScoreView & { supplierId: string; period: string; reportId: string };
+export type EmissionDoc = EmissionView & { supplierId: string; period: string; reportId: string };
+export function useMyEmissions() {
+  const sid = useSupplierId();
+  return useQuery<EmissionDoc>("emission_results", sid ? [where("supplierId", "==", sid)] : null, [sid]);
 }
 export function useMyScores() {
   const sid = useSupplierId();

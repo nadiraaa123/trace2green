@@ -1,10 +1,9 @@
 "use client";
 import { collection, getCountFromServer, onSnapshot, query, where } from "firebase/firestore";
-import { LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Alert } from "@/components/ui/Field";
-import { Logo } from "@/components/ui/Logo";
+import { CompanyHeader } from "@/components/company/CompanyHeader";
 import { db } from "@/lib/firebase/client";
 import { STATUS_LABEL } from "@/lib/constants";
 import { formatPeriod } from "@/lib/period";
@@ -13,7 +12,7 @@ import { useDoc } from "@/lib/useDoc";
 
 // Phase 1 placeholder: verifies company-scoped reads. Full dashboard is Phase 4.
 export default function CompanyHome() {
-  const { claims, signOut, user } = useAuth();
+  const { claims } = useAuth();
   const { data } = useDoc<CompanyDoc>(claims.companyId ? `companies/${claims.companyId}` : null);
   const [related, setRelated] = useState<number | null>(null);
   const [reports, setReports] = useState<MonthlyReportDoc[]>([]);
@@ -32,24 +31,18 @@ export default function CompanyHome() {
       .catch(() => setRelated(null));
   }, [claims.companyId]);
 
+  const live = reports.filter((r) => !r.isSimulated);
   return (
     <main className="mx-auto max-w-5xl px-8 py-8">
-      <header className="flex items-center justify-between">
-        <Logo />
-        <div className="flex items-center gap-4 text-sm text-navy-500">
-          <span>{user?.email}</span>
-          <button onClick={signOut} className="inline-flex items-center gap-1.5 hover:text-navy-900">
-            <LogOut className="size-4" /> Keluar
-          </button>
-        </div>
-      </header>
+      <CompanyHeader />
       <h1 className="mt-10 text-2xl font-semibold">{data?.name ?? claims.companyId}</h1>
       <p className="mt-1 text-sm text-navy-500">Pemasok terhubung: {related ?? "—"}</p>
-      <p className="mt-1 text-sm text-navy-500" data-testid="report-count">Laporan diterima (real-time): {reports.length}</p>
+      <p className="mt-1 text-sm text-navy-500" data-testid="report-count">Laporan diterima (real-time): {live.length}</p>
+      <p className="mt-1 text-xs text-navy-500">Data simulasi workbook (tidak dihitung di atas): {reports.length - live.length} laporan</p>
       <ul className="mt-4 max-w-xl divide-y divide-line rounded-xl border border-line bg-white text-sm">
-        {reports.map((r) => (
+        {live.map((r) => (
           <li key={r.reportId} className="flex justify-between px-4 py-2.5">
-            <span>{r.supplierId} · {formatPeriod(r.period)}</span><span>{STATUS_LABEL[r.status]}</span>
+            <span>{r.supplierId} · {formatPeriod(r.period)}{r.isSimulated ? " · simulasi" : ""}</span><span>{STATUS_LABEL[r.status]}</span>
           </li>
         ))}
       </ul>

@@ -8,7 +8,8 @@ INVITE=$(echo "$OUT" | sed -n 's/^INVITE=//p')
 CONNECT=$(echo "$OUT" | sed -n 's/^CONNECT=//p')
 npx next start -p 3000 > /tmp/t2g-next.log 2>&1 &
 NEXT_PID=$!
-trap 'kill $NEXT_PID 2>/dev/null; pkill -f "next start -p 3000" 2>/dev/null; pkill -f next-server 2>/dev/null; true' EXIT
+cleanup() { kill $NEXT_PID 2>/dev/null || true; pkill -f next-server 2>/dev/null || true; for i in $(seq 1 20); do curl -sf http://127.0.0.1:3000 >/dev/null || break; sleep 0.5; done; }
+trap cleanup EXIT
 for i in $(seq 1 60); do curl -sf http://127.0.0.1:3000 >/dev/null && break; sleep 1; done
 node tests/e2e/phase1.e2e.cjs "$INVITE"
 node tests/e2e/phase2.e2e.cjs "$CONNECT"

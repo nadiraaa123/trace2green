@@ -5,6 +5,7 @@ import { PERIOD_RE, reportId as makeReportId } from "@/lib/constants";
 import { isReportable, referenceDate } from "@/lib/period";
 import { missingItems, submitBlockers } from "@/lib/report";
 import type { ReportStatus } from "@/lib/types";
+import { calculate, loadReferenceData, writeCalculation } from "./calculation";
 import { grantedCompanies, requireSupplier } from "./sharing";
 import { AppError } from "./suppliers";
 
@@ -53,6 +54,7 @@ export async function submitReport(db: Firestore, caller: Caller, period: string
   // Consents are read outside the transaction; a consent change concurrently
   // re-propagates sharedWith over all docs, so the end state stays consistent.
   const sharedWith = await grantedCompanies(db, supplierId);
+  const refData = await loadReferenceData(db);
 
   const result = await db.runTransaction(async (tx) => {
     const snap = await tx.get(reportRef);
@@ -92,6 +94,13 @@ export async function submitReport(db: Firestore, caller: Caller, period: string
       dataSource: r.dataSource, isSimulated: r.isSimulated ?? false, submittedAt: now, submittedByUid: caller.uid,
     });
     evidence.docs.forEach((d) => tx.update(d.ref, { sharedWith }));
+    // Emissions + provisional score. Evidence is not yet checked by a reviewer → unavailable, not 0.
+    const calc = calculate(profile, activity, null, refData);
+    writeCalculation(db, tx, calc, refData, {
+      reportId: rid, supplierId, period, reportVersion: version, reportStatus: "submitted", sharedWith,
+      dataSource: r.dataSource ?? "trial", trigger: version === 1 ? "submission" : "resubmission", actorUid: caller.uid,
+      scoreType: "provisional", profile, activity, checkedKwh: null,
+    });
     tx.create(db.collection("verification_records").doc(), {
       reportId: rid, supplierId, action: version === 1 ? "submitted" : "resubmitted",
       fromStatus: from, toStatus: "submitted", actorUid: caller.uid, actorRole: "supplier",

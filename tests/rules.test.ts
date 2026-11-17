@@ -233,3 +233,27 @@ describe("Phase 2: evidence metadata and not-applicable categories", () => {
     await assertFails(deleteDoc(doc(sup1(), "monthly_reports/SUP-001_2027-02")));
   });
 });
+
+describe("Phase 3: score history and verification are server-only", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "supplier_scores/SUP-001_2027-01/versions/a"), { supplierId: "SUP-001", sharedWith: ["CMP-A"], trigger: "submission" });
+      await setDoc(doc(db, "benchmarks/wb-minuman"), { status: "simulated_sample_average" });
+    });
+  });
+  it("score versions follow the same isolation as scores", async () => {
+    await assertSucceeds(getDoc(doc(sup1(), "supplier_scores/SUP-001_2027-01/versions/a")));
+    await assertSucceeds(getDoc(doc(companyA(), "supplier_scores/SUP-001_2027-01/versions/a")));
+    await assertFails(getDoc(doc(companyB(), "supplier_scores/SUP-001_2027-01/versions/a")));
+    await assertFails(getDoc(doc(sup51(), "supplier_scores/SUP-001_2027-01/versions/a")));
+  });
+  it("nobody writes scores, versions, emissions, factors or status from the client — even a reviewer", async () => {
+    const reviewer = env.authenticatedContext("rv", { role: "company_admin", companyId: "CMP-A", canVerify: true }).firestore();
+    await assertFails(setDoc(doc(reviewer, "supplier_scores/SUP-001_2027-01/versions/b"), { supplierId: "SUP-001", sharedWith: ["CMP-A"] }));
+    await assertFails(updateDoc(doc(reviewer, "monthly_reports/SUP-001_2027-01"), { status: "verified" }));
+    await assertFails(setDoc(doc(reviewer, "emission_factors/x"), { kgCO2ePerUnit: 0 }));
+    await assertFails(setDoc(doc(reviewer, "benchmarks/x"), { status: "industry_verified" }));
+    await assertSucceeds(getDoc(doc(reviewer, "benchmarks/wb-minuman")));
+  });
+});

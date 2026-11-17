@@ -2,7 +2,8 @@
  * Controlled provisioning of company admins and the platform admin.
  * Company accounts are never self-registered.
  *
- *   npx tsx scripts/provision.ts company <companyId> "<Company name>" <email> <password> [demo|trial|production]
+ *   npx tsx scripts/provision.ts company <companyId> "<Company name>" <email> <password> [demo|trial|production] [--no-verify]
+ *   (company admins can verify reports by default; --no-verify creates a view-only admin)
  *   npx tsx scripts/provision.ts platform-admin <email> <password>
  *
  * Passwords are passed on the command line for local/demo setup only; for a real
@@ -26,7 +27,8 @@ async function main() {
   const now = FieldValue.serverTimestamp();
 
   if (kind === "company") {
-    const [companyId, name, email, password, ds = "demo"] = args;
+    const canVerify = !args.includes("--no-verify");
+    const [companyId, name, email, password, ds = "demo"] = args.filter((a) => a !== "--no-verify");
     if (!/^CMP-[A-Z0-9]+$/.test(companyId ?? "") || !name || !email || !password) {
       throw new Error("Usage: company <CMP-X> <name> <email> <password> [dataSource]");
     }
@@ -41,10 +43,10 @@ async function main() {
     );
     await db.doc(`users/${user.uid}`).set({
       uid: user.uid, email, displayName: `Admin ${name}`, role: "company_admin",
-      companyId, supplierId: null, dataSource: ds, isSimulated: false, createdAt: now, updatedAt: now,
+      companyId, supplierId: null, canVerify, dataSource: ds, isSimulated: false, createdAt: now, updatedAt: now,
     }, { merge: true });
-    await auth.setCustomUserClaims(user.uid, { role: "company_admin", companyId });
-    console.log(`Company admin ${email} -> ${companyId}`);
+    await auth.setCustomUserClaims(user.uid, { role: "company_admin", companyId, canVerify });
+    console.log(`Company admin ${email} -> ${companyId}${canVerify ? " (reviewer)" : " (view only)"}`);
   } else if (kind === "platform-admin") {
     const [email, password] = args;
     const user = await upsertUser(email, password, "Platform Admin");

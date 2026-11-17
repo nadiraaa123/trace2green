@@ -14,10 +14,12 @@ not certified carbon accounting and not a guarantee of PSPK compliance.
 |---|---|
 | 1 Foundation (auth, roles, rules, supplier identity) | ✅ tested on emulator |
 | 2 Supplier portal (home, profile, wizard, drafts, submission, history, consent) | ✅ tested on emulator |
-| 3 Workbook seed, emissions, scoring, verification | not started |
-| 4 Company dashboard | placeholder only (live list of received reports) |
+| 3 Workbook seed, emissions, scoring, verification | ✅ tested on emulator |
+| 4 Company dashboard | not started (interim pages: received reports, verification queue, review) |
 | 5 Google Sheets / Looker Studio | not started (needs Google credentials) |
 | 6 QA + Vercel deploy | not started (needs Firebase + Vercel projects) |
+
+Scores: live reports show each component's status; a final score appears only when completeness, evidence and intensity are all available. No industry benchmark exists yet, so live reports have no final score (see ARCHITECTURE §7).
 
 Evidence files are **not stored**: the wizard shows a demo-only preview and
 records metadata (name, type, size). See ARCHITECTURE §5.
@@ -62,6 +64,14 @@ Create a company admin and a connect code on the emulator (company accounts are 
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 npm run provision -- company CMP-A "Perusahaan Mitra A" admin@mitra-a.test rahasia123 demo
 ```
 
+Import the simulated workbook (100 suppliers, 277 reports, 12 audits; idempotent, safe to re-run):
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run seed
+```
+
+`npm run seed -- --dry-run` shows what would change. Seeding a real project requires `--confirm-production`.
+
 Suppliers register at `/daftar`. A self-registered supplier links to a buyer in
 **Perusahaan Terhubung** using a code from `POST /api/companies/invites` (called
 by the company admin; the dashboard UI for it comes in Phase 4).
@@ -97,7 +107,7 @@ npm run typecheck && npm run lint
 ```
 
 - `npm test`: unit tests, Firestore security-rules tests and server workflow tests on the emulator.
-- `npm run test:e2e`: production build, then browser tests of the Phase 1 auth flows and the full Phase 2 supplier workflow (with a live company view), then database assertions.
+- `npm run test:e2e`: production build, then browser tests of the Phase 1 auth flows and the full Phase 2 supplier workflow (with a live company view) plus database assertions, then the Phase 3 flow on a fully seeded database (simulated history, live submission, company review, live status update).
 
 ## Repository hygiene
 

@@ -9,6 +9,7 @@ export interface Claims {
   role: Role | null;
   supplierId: string | null;
   companyId: string | null;
+  canVerify: boolean;
 }
 
 interface AuthState {
@@ -20,7 +21,7 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
-const empty: Claims = { role: null, supplierId: null, companyId: null };
+const empty: Claims = { role: null, supplierId: null, companyId: null, canVerify: false };
 const Ctx = createContext<AuthState | null>(null);
 
 function pick(c: Record<string, unknown>): Claims {
@@ -28,6 +29,7 @@ function pick(c: Record<string, unknown>): Claims {
     role: (c.role as Role) ?? null,
     supplierId: (c.supplierId as string) ?? null,
     companyId: (c.companyId as string) ?? null,
+    canVerify: c.canVerify === true,
   };
 }
 

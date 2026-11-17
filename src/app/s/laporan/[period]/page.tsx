@@ -3,6 +3,7 @@ import { deleteDoc, doc } from "firebase/firestore";
 import { AlertTriangle, CheckCircle2, Circle, FileWarning, Paperclip, PencilLine, Send, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { EmissionBreakdown, ScoreBreakdown, type EmissionView, type ScoreView } from "@/components/results/Breakdown";
 import { ReportSummary } from "@/components/supplier/ReportSummary";
 import { Card, LinkButton, PageHeader, StatusBadge } from "@/components/supplier/ui";
 import { Button } from "@/components/ui/Button";
@@ -21,10 +22,10 @@ const ACTION_LABEL: Record<VerificationRecordDoc["action"], string> = {
   submitted: "Laporan dikirim",
   resubmitted: "Laporan dikirim ulang",
   supplier_correction_request: "Anda mengajukan koreksi",
-  approve: "Diverifikasi perusahaan",
+  approve: "Disetujui peninjau",
   request_revision: "Perusahaan meminta perbaikan",
   reject: "Laporan ditolak",
-  sample_audit: "Audit sampel",
+  sample_audit: "Audit sampel (data simulasi)",
 };
 
 export default function ReportDetailPage() {
@@ -34,6 +35,8 @@ export default function ReportDetailPage() {
   const rid = reportId(sid, period);
   const { data: r, loading } = useDoc<MonthlyReportDoc & { missingFields?: string[] }>(`monthly_reports/${rid}`);
   const history = useReportHistory(rid);
+  const { data: score } = useDoc<ScoreView>(`supplier_scores/${rid}`);
+  const { data: emission } = useDoc<EmissionView>(`emission_results/${rid}`);
   const evidence = useEvidence(rid);
   const rels = useRelationships();
   const consents = useConsents();
@@ -84,6 +87,9 @@ export default function ReportDetailPage() {
           <span className="text-sm text-navy-500">Status</span>
           <StatusBadge status={r.status} />
         </div>
+        {r.status === "imported_simulated" && (
+          <p className="mt-3 text-sm text-navy-700">Laporan contoh dari workbook simulasi (Januari–Maret 2027). Tidak masuk alur verifikasi; hasil bukti workbook: <b>{(r as { workbook?: { evidenceStatus?: string } }).workbook?.evidenceStatus ?? "—"}</b>.</p>
+        )}
         {r.status === "submitted" && (
           <p className="mt-3 text-sm text-navy-700">Laporan sudah diterima dan menunggu verifikasi oleh perusahaan pembeli. Skor muncul setelah verifikasi.</p>
         )}
@@ -143,7 +149,15 @@ export default function ReportDetailPage() {
         </section>
       )}
 
-      {missing.length > 0 && (
+      {(score || emission) && (
+        <section className="mt-5 space-y-2.5">
+          <h2 className="text-sm font-semibold">Estimasi emisi & penilaian</h2>
+          {score && <ScoreBreakdown score={score} />}
+          {emission && <EmissionBreakdown e={emission} />}
+        </section>
+      )}
+
+      {missing.length > 0 && r.status !== "imported_simulated" && (
         <section className="mt-5 rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
           <p className="flex items-center gap-2 text-sm font-semibold text-amber-800"><AlertTriangle className="size-4" /> {missing.length} isian belum lengkap</p>
           <p className="mt-1 text-xs text-amber-800/80">{missing.map((m) => m.label).join(", ")}</p>

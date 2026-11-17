@@ -4,6 +4,7 @@ import { ArrowLeft, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { STATUS_LABEL } from "@/lib/constants";
+import { supplierStatus, type ReviewLite } from "@/lib/review-status";
 import type { ReportStatus } from "@/lib/types";
 
 export function Card({ className, children, ...p }: React.HTMLAttributes<HTMLDivElement>) {
@@ -36,12 +37,19 @@ const STATUS_STYLE: Record<ReportStatus | "none", string> = {
   none: "bg-slate-100 text-navy-500",
 };
 
-export function StatusBadge({ status }: { status: ReportStatus | null }) {
+export function StatusBadge({ status, label }: { status: ReportStatus | "partial" | null; label?: string }) {
+  const style = status === "partial" ? "bg-teal-50 text-teal-700" : STATUS_STYLE[status ?? "none"];
   return (
-    <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", STATUS_STYLE[status ?? "none"])}>
-      {status ? STATUS_LABEL[status] : "Belum diisi"}
+    <span className={clsx("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", style)}>
+      {label ?? (status && status !== "partial" ? STATUS_LABEL[status] : "Belum diisi")}
     </span>
   );
+}
+
+/** Status badge that reflects each buyer's own decision. */
+export function DerivedStatus({ report, reviews }: { report: Parameters<typeof supplierStatus>[0]; reviews: ReviewLite[] }) {
+  const s = supplierStatus(report, reviews);
+  return <StatusBadge status={s.tone} label={s.label} />;
 }
 
 export function IconTile({ icon: Icon, tone = "brand" }: { icon: LucideIcon; tone?: "brand" | "blue" | "amber" | "violet" | "slate" }) {

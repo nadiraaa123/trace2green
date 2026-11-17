@@ -12,6 +12,7 @@ import { missingItems } from "@/lib/report";
 import type { EmissionFactor } from "@/lib/emissions";
 import type { ScoringParams } from "@/lib/scoring";
 import type { ActivityData, ReportProfile } from "@/lib/types";
+import { recomputeCompanyAll } from "./stats";
 import type { Workbook } from "./workbook";
 
 const SOURCE = "Dummy Data Analisis.xlsx";
@@ -82,6 +83,8 @@ interface Planned { ref: DocumentReference; data: Record<string, unknown>; mode:
 
 export interface SeedStats {
   planned: number; written: number; skippedUnchanged: number; conflicts: string[];
+  /** Company summary docs (re)written after the import; 0 when nothing changed. */
+  statsWritten: number;
   counts: Record<string, number>;
 }
 
@@ -204,7 +207,7 @@ export async function seedWorkbook(db: Firestore, wb: Workbook, opts: { dryRun?:
   }
 
   // ---- apply ----
-  const stats: SeedStats = { planned: plan.length, written: 0, skippedUnchanged: 0, conflicts: [], counts: {} };
+  const stats: SeedStats = { planned: plan.length, written: 0, skippedUnchanged: 0, conflicts: [], counts: {}, statsWritten: 0 };
   for (const p of plan) {
     const col = p.ref.parent.id;
     stats.counts[col] = (stats.counts[col] ?? 0) + 1;
@@ -267,5 +270,8 @@ export async function seedWorkbook(db: Firestore, wb: Workbook, opts: { dryRun?:
     }
   }
   stats.written = writes.length;
+  if (!opts.dryRun) {
+    for (const buyer of new Set(wb.suppliers.map((x) => x.buyer))) stats.statsWritten += await recomputeCompanyAll(db, companyIdFor(buyer));
+  }
   return stats;
 }

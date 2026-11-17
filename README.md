@@ -15,7 +15,7 @@ not certified carbon accounting and not a guarantee of PSPK compliance.
 | 1 Foundation (auth, roles, rules, supplier identity) | ✅ tested on emulator |
 | 2 Supplier portal (home, profile, wizard, drafts, submission, history, consent) | ✅ tested on emulator |
 | 3 Workbook seed, emissions, scoring, verification | ✅ tested on emulator |
-| 4 Company dashboard | not started (interim pages: received reports, verification queue, review) |
+| 4 Company dashboard (8 menus, filters Semua/Simulasi/Trial, company-scoped verification) | ✅ tested on emulator |
 | 5 Google Sheets / Looker Studio | not started (needs Google credentials) |
 | 6 QA + Vercel deploy | not started (needs Firebase + Vercel projects) |
 
@@ -72,6 +72,8 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm run seed
 
 `npm run seed -- --dry-run` shows what would change. Seeding a real project requires `--confirm-production`.
 
+Demo scoring (optional): set `DEMO_SIMULATED_BENCHMARK=true` (server env) to let live reports use the simulated group average as a **labeled demo** benchmark. Leave it unset in production.
+
 Suppliers register at `/daftar`. A self-registered supplier links to a buyer in
 **Perusahaan Terhubung** using a code from `POST /api/companies/invites` (called
 by the company admin; the dashboard UI for it comes in Phase 4).
@@ -107,7 +109,7 @@ npm run typecheck && npm run lint
 ```
 
 - `npm test`: unit tests, Firestore security-rules tests and server workflow tests on the emulator.
-- `npm run test:e2e`: production build, then browser tests of the Phase 1 auth flows and the full Phase 2 supplier workflow (with a live company view) plus database assertions, then the Phase 3 flow on a fully seeded database (simulated history, live submission, company review, live status update).
+- `npm run test:e2e`: production build, then browser tests of the Phase 1 auth flows and the full Phase 2 supplier workflow (with a live company view) plus database assertions, then the Phase 3 flow on a fully seeded database, then the Phase 4 phone-to-laptop demo (seeded dashboard, invitation from Settings, live KPI updates, Trial filter, company-scoped review, CSV export).
 
 ## Repository hygiene
 

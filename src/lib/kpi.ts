@@ -1,0 +1,167 @@
+// Company dashboard KPIs (pure). One row per related supplier per period lives in
+// the server-maintained summary doc company_period_stats/{companyId}_{period}.
+// Rules:
+// - Simulated (demo) and trial rows are NEVER averaged together. "Semua" returns
+//   both groups side by side.
+// - Missing data stays missing: averages state their n and what was excluded.
+// - Nothing here invents values; every number is derived from the rows.
+import type { ActivityCategory } from "./types";
+
+export type Source = "demo" | "trial";
+export type SourceFilter = "all" | Source;
+export type RowReportStatus = "no_consent" | "missing" | "draft" | "submitted" | "revision_requested" | "imported_simulated";
+export type RowReviewStatus = "pending" | "verified" | "revision_requested" | "rejected" | "awaiting_resubmission" | null;
+export type EvidenceState = "match" | "mismatch" | "unverifiable" | null;
+
+export interface StatsRow {
+  supplierId: string;
+  name: string;
+  sector: string | null;
+  region: string | null;
+  source: Source;
+  critical: boolean;
+  consent: boolean;
+  reportStatus: RowReportStatus;
+  reportVersion: number | null;
+  reviewStatus: RowReviewStatus; // this company's review (trial only)
+  evidenceCount: number | null; // in-app evidence metadata entries (no files stored)
+  final: number | null;
+  color: "HIJAU" | "KUNING" | "MERAH" | null;
+  scoreBasis: "workbook_simulated" | "engine_provisional" | "engine_company_review" | null;
+  benchmarkBasis: "simulated_sample_average" | "industry_verified" | null;
+  completeness: number | null; // 0–1
+  evidence: EvidenceState;
+  intensity: number | null;
+  intensityRatio: number | null;
+  totalKg: number | null;
+  totalStatus: "workbook" | "complete" | "partial" | "unavailable" | null;
+  byCategory: Record<ActivityCategory, number | null> | null; // null = not calculated (missing), 0 = genuine zero
+  blankAsZero: ActivityCategory[]; // workbook rows only: blanks the workbook counted as 0
+  kwh: number | null;
+}
+
+export interface PeriodStats { companyId: string; period: string; rows: StatsRow[] }
+
+export const CATEGORIES: ActivityCategory[] = ["listrik", "bbm", "kemasan", "limbah", "transportasi"];
+const RECEIVED: RowReportStatus[] = ["submitted", "revision_requested", "imported_simulated"];
+
+export interface SourceKpis {
+  source: Source;
+  related: number; // relationships
+  consented: number; // suppliers sharing data (denominator)
+  received: number; // reports received (incl. revision-required)
+  missing: number;
+  draft: number;
+  revision: number;
+  completionRate: number | null; // received / consented
+  avgScore: number | null;
+  scored: number; // n behind avgScore
+  unscored: number; // received reports without a final score
+  colors: { HIJAU: number; KUNING: number; MERAH: number; none: number };
+  emissions: { totalKg: number; byCategory: Record<ActivityCategory, number>; complete: number; partial: number; unavailable: number; workbook: number };
+  avgCompleteness: number | null;
+  evidence: { match: number; mismatch: number; unverifiable: number };
+  review: { pending: number; verified: number; rejected: number; revisionRequested: number; awaiting: number };
+  attention: number;
+}
+
+/** A supplier "needs attention" when there is something to act on. */
+export function attentionReasons(r: StatsRow): string[] {
+  if (!r.consent) return [];
+  const out: string[] = [];
+  if (r.reportStatus === "missing") out.push("Belum mengirim laporan");
+  if (r.reportStatus === "revision_requested") out.push("Perlu perbaikan");
+  if (r.color === "MERAH") out.push("Status MERAH");
+  if (r.evidence === "mismatch") out.push("Bukti tidak cocok");
+  if (r.reviewStatus === "pending") out.push("Menunggu verifikasi Anda");
+  return out;
+}
+
+export function kpisFor(rows: StatsRow[], source: Source): SourceKpis {
+  const rs = rows.filter((r) => r.source === source);
+  const consented = rs.filter((r) => r.consent);
+  const received = consented.filter((r) => RECEIVED.includes(r.reportStatus));
+  const scored = received.filter((r) => r.final != null);
+  const withCompleteness = received.filter((r) => r.completeness != null);
+  const byCategory = Object.fromEntries(CATEGORIES.map((c) => [c, 0])) as Record<ActivityCategory, number>;
+  const em = { totalKg: 0, byCategory, complete: 0, partial: 0, unavailable: 0, workbook: 0 };
+  for (const r of received) {
+    if (r.totalStatus === "unavailable" || r.totalKg == null) { em.unavailable++; continue; }
+    em.totalKg += r.totalKg;
+    if (r.totalStatus === "workbook") em.workbook++;
+    else if (r.totalStatus === "complete") em.complete++;
+    else em.partial++;
+    for (const c of CATEGORIES) em.byCategory[c] += r.byCategory?.[c] ?? 0; // null (missing) adds nothing — it is not a zero claim
+  }
+  const count = (f: (r: StatsRow) => boolean) => received.filter(f).length;
+  return {
+    source,
+    related: rs.length,
+    consented: consented.length,
+    received: received.length,
+    missing: consented.filter((r) => r.reportStatus === "missing").length,
+    draft: consented.filter((r) => r.reportStatus === "draft").length,
+    revision: consented.filter((r) => r.reportStatus === "revision_requested").length,
+    completionRate: consented.length ? received.length / consented.length : null,
+    avgScore: scored.length ? scored.reduce((s, r) => s + r.final!, 0) / scored.length : null,
+    scored: scored.length,
+    unscored: received.length - scored.length,
+    colors: { HIJAU: count((r) => r.color === "HIJAU"), KUNING: count((r) => r.color === "KUNING"), MERAH: count((r) => r.color === "MERAH"), none: count((r) => r.color == null) },
+    emissions: em,
+    avgCompleteness: withCompleteness.length ? withCompleteness.reduce((s, r) => s + r.completeness!, 0) / withCompleteness.length : null,
+    evidence: { match: count((r) => r.evidence === "match"), mismatch: count((r) => r.evidence === "mismatch"), unverifiable: count((r) => r.evidence === "unverifiable") },
+    review: {
+      pending: count((r) => r.reviewStatus === "pending"), verified: count((r) => r.reviewStatus === "verified"),
+      rejected: count((r) => r.reviewStatus === "rejected"), revisionRequested: count((r) => r.reviewStatus === "revision_requested"),
+      awaiting: count((r) => r.reviewStatus === "awaiting_resubmission"),
+    },
+    attention: consented.filter((r) => attentionReasons(r).length > 0).length,
+  };
+}
+
+/** KPIs per selected source; "all" returns both groups, never a blended average. */
+export function kpis(rows: StatsRow[], filter: SourceFilter): SourceKpis[] {
+  return filter === "all" ? [kpisFor(rows, "demo"), kpisFor(rows, "trial")] : [kpisFor(rows, filter)];
+}
+
+export const filterRows = (rows: StatsRow[], f: SourceFilter) => (f === "all" ? rows : rows.filter((r) => r.source === f));
+
+export const SOURCE_LABEL: Record<Source, string> = { demo: "Simulasi", trial: "Trial" };
+
+/**
+ * High-consumption flags from real comparisons only:
+ * 1) electricity up > threshold vs the same supplier's previous period;
+ * 2) intensity ratio above the red threshold vs the (labeled) benchmark.
+ */
+export function consumptionFlags(current: StatsRow[], previous: StatsRow[] | null, increaseThreshold = 0.2, redRatio = 1.15) {
+  const prev = new Map((previous ?? []).map((r) => [r.supplierId, r]));
+  const out: { supplierId: string; name: string; source: Source; kind: "kwh_increase" | "intensity_high"; detail: string }[] = [];
+  for (const r of current) {
+    const p = prev.get(r.supplierId);
+    if (r.kwh != null && p?.kwh != null && p.kwh > 0 && (r.kwh - p.kwh) / p.kwh > increaseThreshold) {
+      out.push({ supplierId: r.supplierId, name: r.name, source: r.source, kind: "kwh_increase",
+        detail: `Listrik naik ${(((r.kwh - p.kwh) / p.kwh) * 100).toFixed(0)}% (${p.kwh} → ${r.kwh} kWh)` });
+    }
+    if (r.intensityRatio != null && r.intensityRatio > redRatio) {
+      out.push({ supplierId: r.supplierId, name: r.name, source: r.source, kind: "intensity_high",
+        detail: `Intensitas ${r.intensityRatio.toFixed(2)}× rata-rata kelompok ${r.benchmarkBasis === "simulated_sample_average" ? "(pembanding simulasi)" : ""}`.trim() });
+    }
+  }
+  return out;
+}
+
+/**
+ * Completion-rate trend per source, only inside that source's reporting window:
+ * simulated data → months that contain simulated reports (the workbook covers Jan–Mar 2027);
+ * trial data → from the first month with a trial report onward. Outside the window the
+ * value is null (no line), never a fabricated 0%.
+ */
+export function completionTrend(periods: { period: string; rows: StatsRow[] }[], source: Source): (number | null)[] {
+  const ks = periods.map((p) => kpisFor(p.rows, source));
+  const first = ks.findIndex((k) => k.received > 0);
+  return ks.map((k, i) => {
+    if (first < 0 || i < first || k.completionRate == null) return null;
+    if (source === "demo" && k.received === 0) return null;
+    return Math.round(k.completionRate * 1000) / 10;
+  });
+}

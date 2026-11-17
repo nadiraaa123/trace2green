@@ -6,7 +6,7 @@ const FAQ = [
   ["Kapan memilih “tidak memakai”?", "Bila usaha Anda memang tidak memakai kategori itu, misalnya tidak memakai BBM sama sekali. Ini berbeda dengan belum tahu angkanya."],
   ["Format angka", "Gunakan titik untuk ribuan dan koma untuk desimal, misalnya 1.250 atau 28,9. Aplikasi menampilkan bagaimana angka Anda terbaca."],
   ["Apakah foto bukti saya disimpan?", "Pada versi demo ini belum. File hanya ditampilkan di perangkat Anda; yang tercatat hanya nama, jenis, dan ukuran file."],
-  ["Siapa yang bisa melihat laporan saya?", "Hanya perusahaan pembeli yang Anda izinkan di menu Perusahaan Terhubung, dan hanya laporan yang sudah dikirim. Draf tidak pernah dibagikan."],
+  ["Siapa yang bisa melihat laporan saya?", "Hanya perusahaan pembeli yang Anda izinkan di menu Perusahaan Terhubung, dan hanya laporan yang sudah dikirim. Isi draf tidak pernah dibagikan; perusahaan hanya melihat bahwa laporan sedang disiapkan. Setiap perusahaan memverifikasi laporan Anda secara terpisah."],
   ["Saya salah mengisi laporan yang sudah dikirim", "Buka laporan tersebut dan pilih “Ajukan koreksi” selama belum diverifikasi. Versi sebelumnya tetap tersimpan sebagai riwayat."],
   ["Apakah skor ini sertifikat emisi resmi?", "Bukan. Skor dan estimasi emisi adalah alat bantu pemantauan, bukan sertifikasi akuntansi karbon atau jaminan kepatuhan PSPK."],
 ];

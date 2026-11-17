@@ -92,3 +92,8 @@ export function formatDateTime(v: unknown) {
   if (ms === Number.MAX_SAFE_INTEGER) return "baru saja";
   return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(ms);
 }
+
+export function useMyReviews() {
+  const sid = useSupplierId();
+  return useQuery<import("./review-status").ReviewLite>("company_reviews", sid ? [where("supplierId", "==", sid)] : null, [sid]);
+}

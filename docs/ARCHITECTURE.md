@@ -1,6 +1,6 @@
 # Trace2Green — Architecture & Implementation Plan
 
-Status: Phases 1–3 (Foundation, Supplier Portal, Data Processing) implemented and tested against the Firebase Emulator Suite.
+Status: Phases 1–4 (Foundation, Supplier Portal, Data Processing, Company Dashboard) implemented and tested against the Firebase Emulator Suite.
 No real Firebase project is connected yet (see "Credentials needed").
 
 ---
@@ -196,7 +196,7 @@ signed upload, without changing the wizard.
 | 1 Foundation ✅ | Project, design tokens, Firebase client/admin, schema types, rules, indexes, supplier registration (idempotent), company provisioning script, claim-by-invite, login + role routing | Rules unit tests + registration/claim integration tests on emulator |
 | 2 Supplier portal ✅ | Home, profile, 4-step wizard, autosave drafts, submit/correction routes, history, consent + connect code | 76 unit/rules/server tests + 26-step browser e2e + DB assertions |
 | 3 Data processing ✅ | Idempotent seed, emission engine, scoring engine, verification workflow, reviewer queue/review pages | Seed run twice (0 writes), Rekap checksums, row-by-row workbook reproduction, role tests, Phase 3 browser e2e |
-| 4 Company dashboard | All 8 menus on real listeners, CSV export | Real-time test: submit on one browser, appears in another |
+| 4 Company dashboard ✅ | 8 menus on summary docs + bounded listeners, company-scoped verification, CSV/print | KPI accuracy vs workbook/Rekap, isolation rules, phone→laptop browser e2e |
 | 5 Analytics | Sheets upsert sync + logs + manual resync, Looker docs | Needs Google credentials |
 | 6 QA | Tests A–F, responsive, security, deploy to Vercel | Full suite green |
 
@@ -254,6 +254,44 @@ score.
 **Reporting dates:** `NEXT_PUBLIC_REPORTING_REFERENCE_DATE` (build-time, unset
 by default → real date). When set, a visible banner says so on supplier and
 company pages. The system clock is never changed.
+
+## 8. Company dashboard (Phase 4)
+
+**Company-scoped verification.** `company_reviews/{companyId}_{reportId}`
+(`status`: pending / verified / rejected / revision_requested /
+awaiting_resubmission, plus the company's checked value and score). Approve and
+reject touch only that company's review; the report keeps `status: submitted`.
+A revision request reopens the report itself (the data must change) and moves
+other companies' pending reviews to `awaiting_resubmission`; a resubmission
+resets every review to `pending` for the new version. Decision records,
+reviews and review score versions carry `sharedWith: [companyId]` and
+`scopeCompanyId`; consent propagation never adds another company to them.
+Suppliers see each buyer's decision separately.
+
+**Summary documents.** `company_period_stats/{companyId}_{period}` holds one
+row per related supplier (source, consent, report status, this company's review
+status, score + basis, completeness, evidence state, emissions per category,
+intensity, kWh). The server rebuilds the affected summaries after submission,
+correction, review, consent/connect, draft create/delete and seeding; unchanged
+summaries are not rewritten. The dashboard listens to ≤ 12 of these docs; detail
+pages use bounded queries (one period, `limit`, company filters). Cost per
+rebuild ≈ 7 queries over one company-period (~300 reads at demo scale).
+A manual "Perbarui ringkasan" button in Settings is a fallback only.
+
+**KPIs** (`src/lib/kpi.ts`, pure and tested): computed per source; "Semua"
+shows Simulasi and Trial side by side, never one blended average. Averages state
+n and how many reports lack a final score. Completion trends are drawn only
+inside each source's reporting window (no fabricated 0%).
+
+**Demo benchmark.** Server env `DEMO_SIMULATED_BENCHMARK=true` lets live scoring
+use the workbook's simulated group average (`simulated_sample_average`), only
+when the production unit is a count (`unit`/`pcs` — an assumption) and the
+total is complete. Every such score carries `benchmarkBasis` and the UI
+labels it as simulated and not an official industry benchmark. Default: off.
+
+**Drafts.** Companies see only that a draft exists (for suppliers who granted
+consent), never its contents; supplier-facing copy states this. Drafts are
+created and deleted through `/api/reports/draft*` so summaries stay current.
 
 ## Credentials needed (not available in this session)
 - Firebase project (Spark): web config + a service account key for `firebase-admin`.

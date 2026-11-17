@@ -257,3 +257,36 @@ describe("Phase 3: score history and verification are server-only", () => {
     await assertSucceeds(getDoc(doc(reviewer, "benchmarks/wb-minuman")));
   });
 });
+
+describe("Phase 4: company summaries and company-scoped reviews", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "company_period_stats/CMP-A_2027-03"), { companyId: "CMP-A", period: "2027-03", rows: [] });
+      await setDoc(doc(db, "company_period_stats/CMP-B_2027-03"), { companyId: "CMP-B", period: "2027-03", rows: [] });
+      await setDoc(doc(db, "company_reviews/CMP-A_SUP-001_2027-01"), { companyId: "CMP-A", supplierId: "SUP-001", reportId: "SUP-001_2027-01", period: "2027-01", status: "verified", sharedWith: ["CMP-A"], scopeCompanyId: "CMP-A" });
+      await setDoc(doc(db, "company_reviews/CMP-B_SUP-001_2027-01"), { companyId: "CMP-B", supplierId: "SUP-001", reportId: "SUP-001_2027-01", period: "2027-01", status: "pending", sharedWith: ["CMP-B"], scopeCompanyId: "CMP-B" });
+    });
+  });
+  it("each company reads only its own summaries (get and list); suppliers and strangers read none", async () => {
+    await assertSucceeds(getDoc(doc(companyA(), "company_period_stats/CMP-A_2027-03")));
+    await assertSucceeds(getDoc(doc(companyA(), "company_period_stats/CMP-A_2099-01"))); // not yet built → empty, not an error
+    await assertFails(getDoc(doc(companyA(), "company_period_stats/CMP-B_2027-03")));
+    const own = await assertSucceeds(getDocs(query(collection(companyA(), "company_period_stats"), where("companyId", "==", "CMP-A"))));
+    expect(own.size).toBe(1);
+    await assertFails(getDocs(query(collection(companyA(), "company_period_stats"), where("companyId", "==", "CMP-B"))));
+    await assertFails(getDocs(collection(companyA(), "company_period_stats")));
+    await assertFails(getDoc(doc(sup1(), "company_period_stats/CMP-A_2027-03")));
+    await assertFails(getDoc(doc(stranger(), "company_period_stats/CMP-A_2027-03")));
+  });
+  it("a company never reads another company's review; the supplier reads both; nobody writes", async () => {
+    await assertSucceeds(getDoc(doc(companyA(), "company_reviews/CMP-A_SUP-001_2027-01")));
+    await assertFails(getDoc(doc(companyA(), "company_reviews/CMP-B_SUP-001_2027-01")));
+    await assertFails(getDoc(doc(companyB(), "company_reviews/CMP-A_SUP-001_2027-01")));
+    await assertSucceeds(getDocs(query(collection(sup1(), "company_reviews"), where("supplierId", "==", "SUP-001"))));
+    await assertFails(getDocs(query(collection(sup51(), "company_reviews"), where("supplierId", "==", "SUP-001"))));
+    const reviewer = env.authenticatedContext("rv", { role: "company_admin", companyId: "CMP-A", canVerify: true }).firestore();
+    await assertFails(updateDoc(doc(reviewer, "company_reviews/CMP-A_SUP-001_2027-01"), { status: "rejected" }));
+    await assertFails(setDoc(doc(reviewer, "company_period_stats/CMP-A_2027-03"), { companyId: "CMP-A", rows: [] }));
+  });
+});

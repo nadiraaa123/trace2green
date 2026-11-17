@@ -1,5 +1,4 @@
 "use client";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { CalendarDays, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -7,17 +6,13 @@ import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Field";
 import { Card, PageHeader, StatusBadge } from "@/components/supplier/ui";
-import { reportId } from "@/lib/constants";
-import { db } from "@/lib/firebase/client";
+import { apiPost, authErrorMessage } from "@/lib/api";
 import { formatPeriod, reportablePeriods } from "@/lib/period";
-import { emptyActivity, emptyProfile } from "@/lib/report";
-import { useMyReports, useSupplier, useSupplierId } from "@/lib/supplier-data";
+import { useMyReports } from "@/lib/supplier-data";
 
 function NewReport() {
   const router = useRouter();
   const params = useSearchParams();
-  const sid = useSupplierId()!;
-  const { data: supplier } = useSupplier();
   const reports = useMyReports();
   const periods = reportablePeriods();
   const existing = new Map(reports.rows.map((r) => [r.period, r]));
@@ -34,26 +29,12 @@ function NewReport() {
     if (ex) return router.push(ex.status === "draft" || ex.status === "revision_requested" ? `/s/laporan/${chosen}/isi` : `/s/laporan/${chosen}`);
     setBusy(true);
     setError(null);
-    const rid = reportId(sid, chosen);
     try {
-      const ref = doc(db, "monthly_reports", rid);
-      if ((await getDoc(ref)).exists()) return router.push(`/s/laporan/${chosen}/isi`);
-      // Business identity is prefilled from the profile; activity data always starts empty.
-      await setDoc(ref, {
-        reportId: rid, supplierId: sid, period: chosen, status: "draft",
-        profile: {
-          ...emptyProfile(),
-          businessName: supplier?.businessName ?? null,
-          sector: supplier?.sector ?? null,
-          mainProduct: supplier?.mainProduct ?? null,
-          employees: supplier?.employees ?? null,
-        },
-        activity: emptyActivity(), draftStep: 1, version: 0, sharedWith: [], submittedAt: null,
-        dataSource: "trial", isSimulated: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-      });
+      // Server creates the draft (prefilled identity, empty activity) and keeps company summaries current.
+      await apiPost("/api/reports/draft", { period: chosen });
       router.push(`/s/laporan/${chosen}/isi`);
     } catch (e) {
-      setError(`Gagal membuat draf (${(e as { code?: string }).code ?? "error"}).`);
+      setError(authErrorMessage(e));
       setBusy(false);
     }
   }
@@ -81,7 +62,7 @@ function NewReport() {
         <Button onClick={start} loading={busy} disabled={!chosen || reports.loading} className="w-full">
           {chosen && existing.has(chosen) ? `Buka laporan ${formatPeriod(chosen)}` : chosen ? `Mulai laporan ${formatPeriod(chosen)}` : "Semua bulan sudah dilaporkan"}
         </Button>
-        <p className="text-center text-xs text-navy-500">Satu laporan per bulan. Laporan yang sudah ada akan dibuka, bukan dibuat ulang.</p>
+        <p className="text-center text-xs text-navy-500">Satu laporan per bulan. Laporan yang sudah ada akan dibuka, bukan dibuat ulang. Isi draf tidak dibagikan; perusahaan terhubung hanya melihat bahwa laporan sedang disiapkan.</p>
         <p className="text-center text-xs"><Link href="/s/bantuan" className="text-brand-600">Data apa yang perlu disiapkan?</Link></p>
       </div>
     </>

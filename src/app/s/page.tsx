@@ -8,9 +8,9 @@ import { useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ReportIllustration } from "@/components/illustrations/ReportIllustration";
 import { Logo } from "@/components/ui/Logo";
-import { Card, IconTile, StatusBadge } from "@/components/supplier/ui";
+import { Card, DerivedStatus, IconTile, StatusBadge } from "@/components/supplier/ui";
 import { defaultPeriod, formatPeriod } from "@/lib/period";
-import { useConsents, useMyReports, useMyScores, useRelationships, useSupplier } from "@/lib/supplier-data";
+import { useConsents, useMyReports, useMyReviews, useMyScores, useRelationships, useSupplier } from "@/lib/supplier-data";
 
 const FEATURES = [
   { href: "/s/laporan/baru", label: "Isi Laporan", desc: "Laporan bulanan", icon: FilePlus2, tone: "brand" as const },
@@ -28,6 +28,7 @@ export default function SupplierHome() {
   const scores = useMyScores();
   const rels = useRelationships();
   const consents = useConsents();
+  const reviews = useMyReviews();
   const [menu, setMenu] = useState(false);
 
   const period = defaultPeriod();
@@ -85,7 +86,7 @@ export default function SupplierHome() {
 
       <section aria-label="Ringkasan" className="mt-4 grid grid-cols-2 gap-3">
         <StatCard icon={CalendarCheck} label={`Status ${formatPeriod(period)}`} loading={reports.loading}>
-          <StatusBadge status={current?.status ?? null} />
+          {current ? <DerivedStatus report={current} reviews={reviews.rows} /> : <StatusBadge status={null} />}
         </StatCard>
         <StatCard icon={ClipboardList} label="Laporan Sebelumnya" loading={reports.loading}>
           <span className="text-2xl font-semibold">{submittedCount}</span>
@@ -137,7 +138,7 @@ export default function SupplierHome() {
                   <p className="text-sm font-semibold">Laporan {formatPeriod(r.period)}</p>
                   <p className="text-xs text-navy-500">{r.version > 0 ? `Versi ${r.version}` : "Belum dikirim"}</p>
                 </div>
-                <StatusBadge status={r.status} />
+                <DerivedStatus report={r} reviews={reviews.rows} />
               </Link>
             ))
           )}

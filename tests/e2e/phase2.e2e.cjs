@@ -59,7 +59,8 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await c.getByLabel("Kata sandi").fill("rahasia123");
   await c.getByRole("button", { name: "Masuk" }).click();
   await c.waitForURL("**/c");
-  await c.getByText("Laporan diterima (real-time): 0").waitFor();
+  await c.goto(BASE + "/c/verifikasi"); // live, company-scoped queue
+  await c.getByText("Tidak ada laporan yang menunggu verifikasi.").waitFor();
 
   // New report
   await p.goto(BASE + "/s");
@@ -102,7 +103,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
   // Drafts are not shared
   await c.waitForTimeout(500);
-  await c.getByText("Laporan diterima (real-time): 0").waitFor();
+  await c.getByText("Tidak ada laporan yang menunggu verifikasi.").waitFor();
   ok("company cannot see the draft");
 
   // Step 3 evidence (demo)
@@ -128,9 +129,9 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok("report submitted with missing waste listed, status Menunggu Verifikasi");
 
   // Real-time on company side (no reload)
-  await c.getByText("Laporan diterima (real-time): 1").waitFor({ timeout: 10000 });
-  await c.getByText("SUP-102 · Maret 2027").waitFor();
-  await c.getByText("Menunggu Verifikasi").waitFor();
+  await c.getByTestId("table-queue").getByText("SUP-102").waitFor({ timeout: 10000 });
+  await c.getByTestId("table-queue").getByText("Maret 2027").waitFor();
+  await c.getByRole("tab", { name: /Menunggu verifikasi\s*1/ }).waitFor();
   if (shots) await c.screenshot({ path: `${shots}/p2-06-company-live.png` });
   ok("company dashboard received the report in real time");
 
@@ -154,7 +155,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await p.getByLabel("Apa yang perlu dikoreksi?").fill("Jumlah limbah lupa diisi");
   await p.getByRole("button", { name: "Ajukan" }).click();
   await p.waitForURL("**/s/laporan/2027-03/isi");
-  await c.getByText("Perlu Perbaikan").waitFor({ timeout: 10000 });
+  await c.getByRole("tab", { name: /Permintaan perbaikan\s*1/ }).waitFor({ timeout: 10000 });
   ok("correction request reopens the report; company sees Perlu Perbaikan live");
   await p.getByRole("button", { name: "Jumlah limbah" }).click();
   await p.getByLabel("Jumlah limbah").fill("22,2");
@@ -167,15 +168,15 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await p.getByRole("link", { name: "Lihat status laporan" }).click();
   await p.getByText("Laporan dikirim ulang (v2)").waitFor();
   await p.getByText("Anda mengajukan koreksi").waitFor();
-  await c.getByText("Menunggu Verifikasi").waitFor({ timeout: 10000 });
+  await c.getByRole("tab", { name: /Menunggu verifikasi\s*1/ }).waitFor({ timeout: 10000 });
   ok("resubmitted as v2 with full status history");
 
   // Consent revoke / restore propagates live
   await p.goto(BASE + "/s/perusahaan");
   await p.getByRole("switch", { name: /Perusahaan Mitra A/ }).click();
-  await c.getByText("Laporan diterima (real-time): 0").waitFor({ timeout: 10000 });
+  await c.getByRole("tab", { name: /Menunggu verifikasi\s*0/ }).waitFor({ timeout: 10000 });
   await p.getByRole("switch", { name: /Perusahaan Mitra A/ }).click();
-  await c.getByText("Laporan diterima (real-time): 1").waitFor({ timeout: 10000 });
+  await c.getByRole("tab", { name: /Menunggu verifikasi\s*1/ }).waitFor({ timeout: 10000 });
   ok("revoking and restoring consent updates the company view in real time");
 
   await p.goto(BASE + "/s");

@@ -2,6 +2,7 @@
 // sharedWith on report-family docs is derived ONLY from consent records here.
 import { FieldValue, type Firestore, Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
+import { recomputeAfterSharingChange } from "./stats";
 import { AppError, hashInvite } from "./suppliers";
 
 interface Caller { uid: string; email: string | null; claims: Record<string, unknown> }
@@ -15,6 +16,7 @@ export const REPORT_FAMILY = [
   "supplier_scores",
   "recommendations",
   "verification_records",
+  "company_reviews",
 ] as const;
 
 export function requireSupplier(caller: Caller): string {
@@ -39,9 +41,13 @@ export async function grantedCompanies(db: Firestore, supplierId: string): Promi
 export async function propagateSharing(db: Firestore, supplierId: string, companyId: string, share: boolean) {
   const op = share ? FieldValue.arrayUnion(companyId) : FieldValue.arrayRemove(companyId);
   const refs: FirebaseFirestore.DocumentReference[] = [];
+  // Company-scoped docs (a company's own review, decision records, review scores) are
+  // only ever shared with that company — never with another buyer.
+  const scopedElsewhere = (data: FirebaseFirestore.DocumentData) => data.scopeCompanyId && data.scopeCompanyId !== companyId;
   for (const col of REPORT_FAMILY) {
     const snap = await db.collection(col).where("supplierId", "==", supplierId).get();
     for (const d of snap.docs) {
+      if (scopedElsewhere(d.data())) continue;
       if (col === "monthly_reports" && d.data().status === "draft") continue;
       if (col === "evidence_metadata" && share && (d.data().sharedWith ?? []).length === 0) {
         // Evidence of an unsubmitted draft stays private until submission.
@@ -52,7 +58,7 @@ export async function propagateSharing(db: Firestore, supplierId: string, compan
     }
   }
   const versions = await db.collectionGroup("versions").where("supplierId", "==", supplierId).get();
-  refs.push(...versions.docs.map((d) => d.ref));
+  refs.push(...versions.docs.filter((d) => !scopedElsewhere(d.data())).map((d) => d.ref));
   for (let i = 0; i < refs.length; i += 400) {
     const batch = db.batch();
     refs.slice(i, i + 400).forEach((r) => batch.update(r, { sharedWith: op }));
@@ -92,6 +98,7 @@ export async function setConsent(db: Firestore, caller: Caller, input: z.infer<t
   }, { merge: true });
   const touched = await propagateSharing(db, supplierId, input.companyId, input.granted);
   await consentRef.update({ propagation: "done", updatedAt: FieldValue.serverTimestamp() });
+  await recomputeAfterSharingChange(db, input.companyId);
   await db.collection("audit_logs").add({
     actorUid: caller.uid,
     action: input.granted ? "consent.grant" : "consent.revoke",
@@ -150,5 +157,6 @@ export async function connectWithInvite(db: Firestore, caller: Caller, input: z.
     await propagateSharing(db, supplierId, companyId, true);
     await db.doc(`supplier_data_sharing_consents/${companyId}_${supplierId}`).update({ propagation: "done" });
   }
+  await recomputeAfterSharingChange(db, companyId);
   return { companyId, companyName, shared: input.shareData };
 }

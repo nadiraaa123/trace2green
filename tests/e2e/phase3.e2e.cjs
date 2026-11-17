@@ -108,8 +108,8 @@ async function register(page, { name, business, email, wa, invite }) {
   const c = await lapA.newPage();
   await login(c, "reviewer@mitra-a.test");
   await c.waitForURL("**/c");
-  await c.getByText("Data simulasi workbook (tidak dihitung di atas)").waitFor();
-  await c.getByText("Laporan diterima (real-time): 1").waitFor();
+  await c.getByTestId("kpi-completion-demo").getByText(/dari 50 laporan masuk/).waitFor();
+  await c.getByTestId("kpi-completion-trial").getByText("1 dari 1 laporan masuk").waitFor();
   await c.goto(BASE + "/c/verifikasi");
   await c.getByText("Roti Rina").waitFor();
   if ((await c.locator("tbody tr").count()) !== 1) throw new Error("queue should hold only the live report");
@@ -137,9 +137,10 @@ async function register(page, { name, business, email, wa, invite }) {
   // Supplier sees it live
   await p.getByText("Terverifikasi").first().waitFor({ timeout: 10000 });
   await p.getByText("Komponen terverifikasi").waitFor({ timeout: 10000 });
+  await p.getByText("Penilaian Perusahaan Mitra A (setelah pemeriksaan perusahaan)").waitFor(); // company-scoped assessment (Phase 4)
   await p.getByText("Cocok: selisih 8.1% (toleransi 10%)").waitFor();
-  await p.getByText("Skor akhir belum tersedia").waitFor();
-  await p.getByText("Disetujui peninjau (v1)").waitFor();
+  await p.getByText("Skor akhir belum tersedia").first().waitFor();
+  await p.getByText("Disetujui perusahaan (v1)").waitFor();
   if (shots) await p.screenshot({ path: `${shots}/p3-04-verified.png`, fullPage: true });
   ok("supplier sees verification, evidence match and that no final score exists without a benchmark — live");
 

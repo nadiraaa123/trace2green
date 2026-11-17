@@ -19,7 +19,7 @@ async function main() {
   console.log(`Target: ${target}  workbook sha256: ${wb.sha256.slice(0, 12)}…`);
   console.log(`Workbook: ${wb.suppliers.length} suppliers, ${wb.submissions.length} report rows, ${wb.audits.length} audits, ${wb.factors.length} factors`);
   const s = await seedWorkbook(db, wb, { dryRun });
-  console.log(`${dryRun ? "[dry run] " : ""}planned ${s.planned}, written ${s.written}, unchanged ${s.skippedUnchanged}, conflicts ${s.conflicts.length}`);
+  console.log(`${dryRun ? "[dry run] " : ""}planned ${s.planned}, written ${s.written}, unchanged ${s.skippedUnchanged}, conflicts ${s.conflicts.length}, company summaries written ${s.statsWritten}`);
   for (const c of s.conflicts.slice(0, 20)) console.log(`  conflict: ${c}`);
   console.log(JSON.stringify(s.counts));
 }

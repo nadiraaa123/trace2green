@@ -2,6 +2,7 @@
 # Runs inside `firebase emulators:exec`. Fixtures → Next server → browser tests (Phase 1 + 2).
 set -euo pipefail
 export FIREBASE_PROJECT_ID=demo-trace2green
+export NEXT_PUBLIC_REPORTING_REFERENCE_DATE=2027-04-05 # same demo clock as the build
 npx tsx scripts/provision.ts company CMP-A "Perusahaan Mitra A" admin@mitra-a.test rahasia123 demo
 OUT=$(npx tsx tests/e2e/fixtures.ts)
 INVITE=$(echo "$OUT" | sed -n 's/^INVITE=//p')

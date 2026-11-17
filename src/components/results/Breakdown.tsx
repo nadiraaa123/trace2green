@@ -9,7 +9,7 @@ export interface ScoreComponentView { key: "completeness" | "evidence" | "intens
 export interface ScoreView {
   scoreType: "simulated" | "provisional" | "verified"; calcSource: string; components: ScoreComponentView[];
   final: number | null; color: "HIJAU" | "KUNING" | "MERAH" | null; colorReason?: string; availableWeight?: number; partialPoints?: number;
-  methodNote?: string; reportStatus?: string;
+  methodNote?: string; reportStatus?: string; benchmarkBasis?: "simulated_sample_average" | "industry_verified" | null;
 }
 export interface EmissionLineView { category: ActivityCategory; status: string; quantity: number | null; unit: string | null; qualifier: string | null; factorValue: number | null; factorStatus: string | null; kgCO2e: number | null; note: string }
 export interface EmissionView {
@@ -56,6 +56,11 @@ export function ScoreBreakdown({ score }: { score: ScoreView }) {
           </li>
         ))}
       </ul>
+      {!simulated && score.benchmarkBasis === "simulated_sample_average" && (
+        <p className="mt-2 rounded-lg bg-violet-50 p-2 text-xs text-violet-800" data-testid="demo-benchmark-note">
+          Intensitas dibandingkan dengan rata-rata kelompok dari data SIMULASI untuk keperluan demonstrasi — bukan pembanding industri resmi dan bukan kinerja lingkungan terverifikasi.
+        </p>
+      )}
       {simulated && score.methodNote && <p className="mt-2 rounded-lg bg-violet-50 p-2 text-xs text-violet-800">{score.methodNote}</p>}
     </div>
   );

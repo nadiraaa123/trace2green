@@ -1,20 +1,19 @@
 "use client";
-import { deleteDoc, doc } from "firebase/firestore";
 import { AlertTriangle, CheckCircle2, Circle, FileWarning, Paperclip, PencilLine, Send, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { EmissionBreakdown, ScoreBreakdown, type EmissionView, type ScoreView } from "@/components/results/Breakdown";
 import { ReportSummary } from "@/components/supplier/ReportSummary";
-import { Card, LinkButton, PageHeader, StatusBadge } from "@/components/supplier/ui";
+import { Card, DerivedStatus, LinkButton, PageHeader } from "@/components/supplier/ui";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Field";
 import { apiPost, authErrorMessage } from "@/lib/api";
 import { reportId } from "@/lib/constants";
 import { EVIDENCE_KIND_LABEL } from "@/lib/evidence/storage";
-import { db } from "@/lib/firebase/client";
 import { formatPeriod } from "@/lib/period";
+import { supplierStatus } from "@/lib/review-status";
 import { missingItems } from "@/lib/report";
-import { formatDateTime, useConsents, useEvidence, useRelationships, useReportHistory, useSupplierId } from "@/lib/supplier-data";
+import { formatDateTime, useConsents, useEvidence, useMyReviews, useRelationships, useReportHistory, useSupplierId } from "@/lib/supplier-data";
 import type { MonthlyReportDoc, VerificationRecordDoc } from "@/lib/types";
 import { useDoc } from "@/lib/useDoc";
 
@@ -22,7 +21,7 @@ const ACTION_LABEL: Record<VerificationRecordDoc["action"], string> = {
   submitted: "Laporan dikirim",
   resubmitted: "Laporan dikirim ulang",
   supplier_correction_request: "Anda mengajukan koreksi",
-  approve: "Disetujui peninjau",
+  approve: "Disetujui perusahaan",
   request_revision: "Perusahaan meminta perbaikan",
   reject: "Laporan ditolak",
   sample_audit: "Audit sampel (data simulasi)",
@@ -40,6 +39,7 @@ export default function ReportDetailPage() {
   const evidence = useEvidence(rid);
   const rels = useRelationships();
   const consents = useConsents();
+  const reviews = useMyReviews();
   const [correcting, setCorrecting] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,6 +57,8 @@ export default function ReportDetailPage() {
   }
 
   const editable = r.status === "draft" || r.status === "revision_requested";
+  const derived = supplierStatus(r, reviews.rows);
+  const undecided = r.status === "submitted" && derived.tone === "submitted";
   const missing = missingItems(r.profile, r.activity);
   const sharedNames = (r.sharedWith ?? []).map((c) => rels.rows.find((x) => x.companyId === c)?.companyName ?? c);
   const latestReviewerNote = [...history.rows].reverse().find((h) => h.action === "request_revision" || h.action === "reject")?.note;
@@ -75,8 +77,12 @@ export default function ReportDetailPage() {
 
   async function removeDraft() {
     if (!confirm("Hapus draf ini? Isian yang belum dikirim akan hilang.")) return;
-    await deleteDoc(doc(db, "monthly_reports", rid));
-    router.push("/s/laporan");
+    try {
+      await apiPost("/api/reports/draft/delete", { period });
+      router.push("/s/laporan");
+    } catch (e) {
+      setError(authErrorMessage(e));
+    }
   }
 
   return (
@@ -85,20 +91,33 @@ export default function ReportDetailPage() {
       <Card className="p-4">
         <div className="flex items-center justify-between">
           <span className="text-sm text-navy-500">Status</span>
-          <StatusBadge status={r.status} />
+          <DerivedStatus report={r} reviews={reviews.rows} />
         </div>
+        {r.status === "submitted" && (r.sharedWith ?? []).length > 1 && (
+          <ul className="mt-3 space-y-1 text-xs" data-testid="per-company-status">
+            {(r.sharedWith ?? []).map((cid) => {
+              const v = reviews.rows.find((x) => x.companyId === cid && x.reportId === rid && x.reportVersion === r.version);
+              const name = rels.rows.find((x) => x.companyId === cid)?.companyName ?? cid;
+              const label = { verified: "Terverifikasi", rejected: "Ditolak", revision_requested: "Minta perbaikan", awaiting_resubmission: "Menunggu kiriman ulang", pending: "Menunggu verifikasi" }[v?.status ?? "pending"];
+              return <li key={cid} className="flex justify-between"><span className="text-navy-500">{name}</span><span className="font-medium">{label}</span></li>;
+            })}
+          </ul>
+        )}
         {r.status === "imported_simulated" && (
           <p className="mt-3 text-sm text-navy-700">Laporan contoh dari workbook simulasi (Januari–Maret 2027). Tidak masuk alur verifikasi; hasil bukti workbook: <b>{(r as { workbook?: { evidenceStatus?: string } }).workbook?.evidenceStatus ?? "—"}</b>.</p>
         )}
-        {r.status === "submitted" && (
-          <p className="mt-3 text-sm text-navy-700">Laporan sudah diterima dan menunggu verifikasi oleh perusahaan pembeli. Skor muncul setelah verifikasi.</p>
+        {undecided && (
+          <p className="mt-3 text-sm text-navy-700">Laporan sudah diterima dan menunggu verifikasi oleh perusahaan pembeli. Setiap perusahaan memverifikasi secara terpisah.</p>
+        )}
+        {r.status === "submitted" && !undecided && (
+          <p className="mt-3 text-sm text-navy-700">Perusahaan sudah memberi keputusan untuk versi ini. Lihat penilaian di bawah.</p>
         )}
         {r.status === "revision_requested" && (
           <div className="mt-3"><Alert tone="info">Laporan dibuka kembali untuk diperbaiki.{latestReviewerNote ? ` Catatan: ${latestReviewerNote}` : ""}</Alert></div>
         )}
         {r.version > 0 && <p className="mt-2 text-xs text-navy-500">Versi terkirim: {r.version} · {formatDateTime(r.submittedAt)}</p>}
         <p className="mt-2 text-xs text-navy-500">
-          {r.status === "draft" ? "Draf belum dibagikan ke perusahaan mana pun." :
+          {r.status === "draft" ? "Isi draf belum dibagikan. Perusahaan terhubung hanya melihat bahwa laporan sedang disiapkan." :
             sharedNames.length ? `Dibagikan ke: ${sharedNames.join(", ")}` : "Belum dibagikan ke perusahaan mana pun."}
         </p>
         {r.status !== "draft" && sharedNames.length === 0 && consents.rows.every((c) => !c.granted) && (
@@ -108,7 +127,7 @@ export default function ReportDetailPage() {
           {editable && (
             <LinkButton href={`/s/laporan/${period}/isi`}><PencilLine className="size-4" /> {r.status === "draft" ? "Lanjutkan pengisian" : "Perbaiki laporan"}</LinkButton>
           )}
-          {r.status === "submitted" && !correcting && (
+          {undecided && !correcting && (
             <Button variant="secondary" onClick={() => setCorrecting(true)}><FileWarning className="size-4" /> Ajukan koreksi</Button>
           )}
           {r.status === "draft" && (
@@ -152,7 +171,18 @@ export default function ReportDetailPage() {
       {(score || emission) && (
         <section className="mt-5 space-y-2.5">
           <h2 className="text-sm font-semibold">Estimasi emisi & penilaian</h2>
-          {score && <ScoreBreakdown score={score} />}
+          {reviews.rows.filter((v) => v.reportId === rid && v.reportVersion === r.version && v.score).map((v) => (
+            <div key={v.companyId}>
+              <p className="mb-1 text-xs font-medium text-navy-500">Penilaian {rels.rows.find((x) => x.companyId === v.companyId)?.companyName ?? v.companyId} (setelah pemeriksaan perusahaan)</p>
+              <ScoreBreakdown score={v.score!} />
+            </div>
+          ))}
+          {score && (
+            <div>
+              {reviews.rows.some((v) => v.reportId === rid && v.score) && <p className="mb-1 text-xs font-medium text-navy-500">Penilaian awal (sebelum pemeriksaan)</p>}
+              <ScoreBreakdown score={score} />
+            </div>
+          )}
           {emission && <EmissionBreakdown e={emission} />}
         </section>
       )}

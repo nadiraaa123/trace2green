@@ -78,7 +78,9 @@ describe("role-based verification permissions", () => {
     await expect(reviewReport(db, viewerA, approve)).rejects.toMatchObject({ code: "forbidden" }); // no canVerify
     await expect(reviewReport(db, reviewerB, approve)).rejects.toMatchObject({ code: "forbidden" }); // not shared with B
     expect((await db.doc(`monthly_reports/${rid()}`).get()).data()!.status).toBe("submitted");
-    await expect(reviewReport(db, platform, approve)).resolves.toMatchObject({ status: "verified" });
+    await expect(reviewReport(db, platform, approve)).rejects.toMatchObject({ code: "company_required" });
+    // Phase 4: decisions are company-scoped; the report's own status stays "submitted".
+    await expect(reviewReport(db, platform, { ...approve, companyId: "CMP-A" })).resolves.toMatchObject({ reviewStatus: "verified", reportStatus: "submitted", companyId: "CMP-A" });
   });
 
   it("simulated workbook reports cannot enter the verification workflow", async () => {
@@ -101,22 +103,25 @@ describe("evidence checking", () => {
     expect(res.evidence.status).toBe("unverifiable");
     const rec = (await db.collection("verification_records").where("reportId", "==", rid()).where("action", "==", "approve").get()).docs[0].data();
     expect(rec.evidenceCheck).toMatchObject({ checkedKwh: null, inAppDocumentInspected: false, tolerance: 0.1 });
-    const sc = (await db.doc(`supplier_scores/${rid()}`).get()).data()!;
-    expect(sc).toMatchObject({ scoreType: "verified", final: null }); // verified components, but no final score
-    expect(sc.components[1].status).toBe("unavailable");
+    const rv = (await db.doc(`company_reviews/CMP-A_${rid()}`).get()).data()!;
+    expect(rv).toMatchObject({ status: "verified", companyId: "CMP-A", sharedWith: ["CMP-A"] });
+    expect(rv.score).toMatchObject({ scoreType: "verified", final: null }); // verified components, but no final score
+    expect(rv.score.components[1].status).toBe("unavailable");
+    // The shared base score stays provisional: one company's check is not everyone's.
+    expect((await db.doc(`supplier_scores/${rid()}`).get()).data()!.scoreType).toBe("provisional");
   });
 
   it("checked value within 10% → Cocok (100); beyond → Tidak cocok (0) and MERAH", async () => {
     await submitted();
     const res = await reviewReport(db, reviewerA, { reportId: rid(), action: "approve", checkedKwh: 370, checkSource: "dokumen_asli" }); // 400 vs 370 = 8.1%
     expect(res.evidence.status).toBe("match");
-    expect((await db.doc(`supplier_scores/${rid()}`).get()).data()!.components[1]).toMatchObject({ status: "available", score: 100 });
+    expect((await db.doc(`company_reviews/CMP-A_${rid()}`).get()).data()!.score.components[1]).toMatchObject({ status: "available", score: 100 });
 
     const other = await newConnectedSupplier(`lain-${Date.now()}@umkm.test`);
     await writeDraft(other.supplierId, "2027-03", { profile, activity });
     await submitReport(db, other.s, "2027-03", REF);
     const res2 = await reviewReport(db, reviewerA, { reportId: `${other.supplierId}_2027-03`, action: "request_revision", note: "kWh tidak sesuai tagihan", checkedKwh: 300, checkSource: "salinan_di_luar_sistem" });
-    expect(res2).toMatchObject({ status: "revision_requested", color: "MERAH" });
+    expect(res2).toMatchObject({ reviewStatus: "revision_requested", reportStatus: "revision_requested", color: "MERAH" });
     expect(res2.evidence.status).toBe("mismatch");
   });
 });
@@ -141,7 +146,8 @@ describe("report and score version history", () => {
     ]);
     expect(scoreVersions[1].color).toBe("MERAH");
     expect(scoreVersions[3].components[1].score).toBe(100); // 310 vs 300 = 3.3%
-    expect((await db.doc(`monthly_reports/${rid()}`).get()).data()!.status).toBe("verified");
+    expect((await db.doc(`company_reviews/CMP-A_${rid()}`).get()).data()!.status).toBe("verified");
+    expect((await db.doc(`monthly_reports/${rid()}`).get()).data()!.status).toBe("submitted");
   });
 
   it("supplier corrections before review also create a new score version", async () => {

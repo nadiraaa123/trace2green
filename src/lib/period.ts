@@ -37,3 +37,9 @@ export function formatPeriod(period: string) {
   const [y, m] = period.split("-").map(Number);
   return `${MONTHS[m - 1]} ${y}`;
 }
+
+/** "2027-03" → "Mar 2027" (chart axes). */
+export function shortPeriod(period: string) {
+  const [y, m] = period.split("-").map(Number);
+  return `${MONTHS[m - 1].slice(0, 3)} ${y}`;
+}

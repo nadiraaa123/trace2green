@@ -5,7 +5,8 @@ import { PERIOD_RE, reportId as makeReportId } from "@/lib/constants";
 import { isReportable, referenceDate } from "@/lib/period";
 import { missingItems, submitBlockers } from "@/lib/report";
 import type { ReportStatus } from "@/lib/types";
-import { calculate, loadReferenceData, writeCalculation } from "./calculation";
+import { calculate, loadReferenceData, writeBaseCalculation } from "./calculation";
+import { recomputeAfterReportChange } from "./stats";
 import { grantedCompanies, requireSupplier } from "./sharing";
 import { AppError } from "./suppliers";
 
@@ -96,11 +97,20 @@ export async function submitReport(db: Firestore, caller: Caller, period: string
     evidence.docs.forEach((d) => tx.update(d.ref, { sharedWith }));
     // Emissions + provisional score. Evidence is not yet checked by a reviewer → unavailable, not 0.
     const calc = calculate(profile, activity, null, refData);
-    writeCalculation(db, tx, calc, refData, {
-      reportId: rid, supplierId, period, reportVersion: version, reportStatus: "submitted", sharedWith,
+    writeBaseCalculation(db, tx, calc, refData, {
+      reportId: rid, supplierId, period, reportVersion: version, sharedWith,
       dataSource: r.dataSource ?? "trial", trigger: version === 1 ? "submission" : "resubmission", actorUid: caller.uid,
-      scoreType: "provisional", profile, activity, checkedKwh: null,
+      profile, activity,
     });
+    // One review per authorized company, scoped to that company. A new version resets every review.
+    for (const companyId of sharedWith) {
+      tx.set(db.doc(`company_reviews/${companyId}_${rid}`), {
+        companyId, reportId: rid, supplierId, period, reportVersion: version, status: "pending",
+        decidedAt: null, decidedByUid: null, note: null, evidence: null, score: null,
+        sharedWith: [companyId], scopeCompanyId: companyId, dataSource: r.dataSource ?? "trial", isSimulated: false,
+        createdAt: now, updatedAt: now,
+      });
+    }
     tx.create(db.collection("verification_records").doc(), {
       reportId: rid, supplierId, action: version === 1 ? "submitted" : "resubmitted",
       fromStatus: from, toStatus: "submitted", actorUid: caller.uid, actorRole: "supplier",
@@ -116,6 +126,7 @@ export async function submitReport(db: Firestore, caller: Caller, period: string
     });
     return { reportId: rid, version, status: "submitted" as const, sharedWith, missingFields: missing };
   });
+  await recomputeAfterReportChange(db, supplierId, period);
   return result;
 }
 
@@ -125,24 +136,29 @@ export const correctionSchema = z.object({
 });
 
 /**
- * Supplier reopens a submitted report that has not been reviewed yet.
- * Verified/rejected reports cannot be reopened by the supplier (Phase 3 adds
- * reviewer-initiated revision requests).
+ * Supplier reopens a submitted report that no company has decided on yet.
+ * Once any company verified or rejected the current version, the supplier cannot
+ * reopen it (that would silently void the decision).
  */
 export async function requestCorrection(db: Firestore, caller: Caller, raw: z.infer<typeof correctionSchema>) {
   const supplierId = requireSupplier(caller);
   const input = correctionSchema.parse(raw);
   const rid = makeReportId(supplierId, input.period);
   const reportRef = db.doc(`monthly_reports/${rid}`);
-  return db.runTransaction(async (tx) => {
+  const res = await db.runTransaction(async (tx) => {
     const snap = await tx.get(reportRef);
     if (!snap.exists || snap.data()!.supplierId !== supplierId) throw new AppError("not_found", "Laporan tidak ditemukan.", 404);
     const r = snap.data()!;
     if (r.status !== "submitted") {
       throw new AppError("not_correctable", "Koreksi hanya dapat diajukan sebelum laporan diverifikasi.", 409);
     }
+    const reviews = await tx.get(db.collection("company_reviews").where("reportId", "==", rid));
+    if (reviews.docs.some((d) => d.data().reportVersion === r.version && ["verified", "rejected"].includes(d.data().status))) {
+      throw new AppError("not_correctable", "Laporan sudah diputuskan oleh perusahaan; koreksi tidak dapat diajukan.", 409);
+    }
     const now = FieldValue.serverTimestamp();
     tx.update(reportRef, { status: "revision_requested", updatedAt: now });
+    reviews.docs.forEach((d) => tx.update(d.ref, { status: "awaiting_resubmission", updatedAt: now }));
     tx.create(db.collection("verification_records").doc(), {
       reportId: rid, supplierId, action: "supplier_correction_request", fromStatus: "submitted",
       toStatus: "revision_requested", actorUid: caller.uid, actorRole: "supplier", note: input.reason,
@@ -153,4 +169,6 @@ export async function requestCorrection(db: Firestore, caller: Caller, raw: z.in
     });
     return { reportId: rid, status: "revision_requested" as const };
   });
+  await recomputeAfterReportChange(db, supplierId, input.period);
+  return res;
 }

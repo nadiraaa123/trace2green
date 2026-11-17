@@ -2,16 +2,17 @@
 import { ClipboardList, FilePlus2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Card, EmptyState, IconTile, LinkButton, PageHeader, StatusBadge } from "@/components/supplier/ui";
+import { Card, DerivedStatus, EmptyState, IconTile, LinkButton, PageHeader } from "@/components/supplier/ui";
 import { STATUS_LABEL } from "@/lib/constants";
 import { formatPeriod } from "@/lib/period";
-import { formatDateTime, useMyReports } from "@/lib/supplier-data";
+import { formatDateTime, useMyReports, useMyReviews } from "@/lib/supplier-data";
 import type { ReportStatus } from "@/lib/types";
 
-const FILTERS: (ReportStatus | "all")[] = ["all", "draft", "submitted", "revision_requested", "verified", "rejected"];
+const FILTERS: (ReportStatus | "all")[] = ["all", "draft", "submitted", "revision_requested", "imported_simulated"];
 
 export default function ReportHistoryPage() {
   const { rows, loading, error } = useMyReports();
+  const reviews = useMyReviews();
   const [filter, setFilter] = useState<ReportStatus | "all">("all");
   const shown = filter === "all" ? rows : rows.filter((r) => r.status === filter);
 
@@ -47,7 +48,7 @@ export default function ReportHistoryPage() {
                   {r.submittedAt ? `Dikirim ${formatDateTime(r.submittedAt)} · v${r.version}` : `Draf · langkah ${r.draftStep ?? 1} dari 4`}
                 </p>
               </div>
-              <StatusBadge status={r.status} />
+              <DerivedStatus report={r} reviews={reviews.rows} />
             </Link>
           ))
         )}

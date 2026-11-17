@@ -213,6 +213,184 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "monthly_reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "period",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "monthly_reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sharedWith",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "supplierId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "period",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "supplier_scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sharedWith",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "supplierId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "period",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "emission_results",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sharedWith",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "supplierId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "period",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "company_reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "period",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "company_reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "company_reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sharedWith",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "company_period_stats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "period",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "verification_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sharedWith",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "company_supplier_relationships",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "companyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "supplierId",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "monthly_reports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sharedWith",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

@@ -1,6 +1,7 @@
 // Minimal fixtures for the Phase 1 browser smoke test (emulator only).
 import { FieldValue } from "firebase-admin/firestore";
 import { db, target } from "../../scripts/_admin";
+import { recomputeCompanyAll } from "../../src/server/stats";
 import { createInvite } from "../../src/server/suppliers";
 
 async function main() {
@@ -18,5 +19,6 @@ async function main() {
   console.log(`INVITE=${code}`);
   const connect = await createInvite(db, { uid: "fixture", email: null, claims: { role: "company_admin", companyId: "CMP-A" } }, null);
   console.log(`CONNECT=${connect.code}`);
+  await recomputeCompanyAll(db, "CMP-A");
 }
 main().then(() => process.exit(0));

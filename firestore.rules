@@ -145,6 +145,20 @@ service cloud.firestore {
     match /recommendations/{id}      { allow get: if isSupplierOf(idOwner(id)); allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
     match /verification_records/{id}  { allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin(); allow write: if false; }
 
+    // A company's own review of a report (decision, checked value, company-specific score).
+    match /company_reviews/{id} {
+      allow read: if (isCompany() && resource.data.companyId == myCompany() && companyCanRead(resource.data))
+                  || ownsDoc(resource.data) || isAdmin();
+      allow write: if false;
+    }
+
+    // Server-maintained dashboard summaries: one doc per company per period.
+    match /company_period_stats/{id} {
+      allow get: if (isCompany() && id.split('_')[0] == myCompany()) || isAdmin();
+      allow list: if (isCompany() && resource.data.companyId == myCompany()) || isAdmin();
+      allow write: if false;
+    }
+
     match /evidence_metadata/{id} {
       allow read: if ownsDoc(resource.data) || companyCanRead(resource.data) || isAdmin();
       allow create: if isSupplierOf(request.resource.data.supplierId)

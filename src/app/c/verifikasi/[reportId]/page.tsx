@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { CompanyHeader } from "@/components/company/CompanyHeader";
+import { ReviewPill } from "@/components/company/ui";
 import { EmissionBreakdown, MethodNote, ScoreBreakdown, type EmissionView, type ScoreView } from "@/components/results/Breakdown";
 import { ReportSummary } from "@/components/supplier/ReportSummary";
 import { StatusBadge } from "@/components/supplier/ui";
@@ -26,7 +26,7 @@ const SOURCES = CHECK_SOURCES;
 type Source = CheckSource;
 const ACTION_LABEL: Record<string, string> = {
   submitted: "Dikirim pemasok", resubmitted: "Dikirim ulang", supplier_correction_request: "Pemasok mengajukan koreksi",
-  approve: "Disetujui", request_revision: "Diminta perbaikan", reject: "Ditolak", sample_audit: "Audit sampel (simulasi)",
+  approve: "Disetujui perusahaan Anda", request_revision: "Diminta perbaikan oleh perusahaan Anda", reject: "Ditolak perusahaan Anda", sample_audit: "Audit sampel (simulasi)",
 };
 
 export default function ReviewPage() {
@@ -37,6 +37,8 @@ export default function ReviewPage() {
   const { data: score } = useDoc<ScoreView>(r ? `supplier_scores/${reportId}` : null);
   const { data: emission } = useDoc<EmissionView>(r ? `emission_results/${reportId}` : null);
   const { data: params } = useDoc<ScoringParams>("meta/scoring_params");
+  const { data: myReview } = useDoc<{ status: "pending" | "verified" | "revision_requested" | "rejected" | "awaiting_resubmission"; reportVersion: number; score?: ScoreView }>(r ? `company_reviews/${cid}_${reportId}` : null);
+  const myStatus = r?.status === "submitted" && (!myReview || myReview.reportVersion !== r.version) ? "pending" : myReview?.status ?? null;
   const [evidence, setEvidence] = useState<EvidenceMetadataDoc[]>([]);
   const [history, setHistory] = useState<(VerificationRecordDoc & { evidenceCheck?: { checkedKwh: number | null; checkSourceLabel: string | null; outcome: { status: string; diffRatio?: number } } })[]>([]);
   const [kwh, setKwh] = useState("");
@@ -64,10 +66,10 @@ export default function ReviewPage() {
     if (!parsed.ok) return setMsg({ tone: "error", text: parsed.error });
     setBusy(action);
     try {
-      const res = await apiPost<{ status: string }>("/api/reports/review", {
+      const res = await apiPost<{ reviewStatus: string }>("/api/reports/review", {
         reportId, action, note, checkedKwh: parsed.value, checkSource: parsed.value != null ? source || null : null,
       });
-      setMsg({ tone: "success", text: `Keputusan tersimpan. Status: ${res.status === "verified" ? "Terverifikasi" : res.status === "rejected" ? "Ditolak" : "Perlu Perbaikan"}.` });
+      setMsg({ tone: "success", text: `Keputusan tersimpan. Status: ${res.reviewStatus === "verified" ? "Terverifikasi" : res.reviewStatus === "rejected" ? "Ditolak" : "Perlu Perbaikan"}.` });
     } catch (e) {
       setMsg({ tone: "error", text: authErrorMessage(e) });
     } finally {
@@ -76,9 +78,8 @@ export default function ReviewPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-8 py-8">
-      <CompanyHeader />
-      <Link href="/c/verifikasi" className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-navy-500 hover:text-navy-900"><ArrowLeft className="size-4" /> Antrean verifikasi</Link>
+    <main>
+      <Link href="/c/verifikasi" className="inline-flex items-center gap-1 text-sm font-medium text-navy-500 hover:text-navy-900"><ArrowLeft className="size-4" /> Antrean verifikasi</Link>
       {loading ? <div className="mt-6 h-40 animate-pulse rounded-2xl bg-white" /> : !r ? (
         <div className="mt-6 max-w-xl"><Alert>{error ? "Anda tidak memiliki akses ke laporan ini." : "Laporan tidak ditemukan."}</Alert></div>
       ) : (
@@ -86,6 +87,7 @@ export default function ReviewPage() {
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-semibold">{r.profile.businessName ?? r.supplierId} · {formatPeriod(r.period)}</h1>
             <StatusBadge status={r.status} />
+            <span className="text-xs text-navy-500">Status untuk perusahaan Anda:</span> <ReviewPill status={myStatus} source="trial" />
             <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-info">{r.dataSource}</span>
           </div>
           <p className="mt-1 text-sm text-navy-500">{r.supplierId} · versi {r.version} · dikirim {formatDateTime(r.submittedAt)}</p>
@@ -102,7 +104,9 @@ export default function ReviewPage() {
                   <ul className="mt-3 space-y-1">{evidence.map((e) => <li key={e.fileName + e.sizeBytes}>• {e.fileName} — {EVIDENCE_KIND_LABEL[e.kind]}</li>)}</ul>
                 ) : <p className="mt-3">Pemasok tidak mencatat bukti apa pun.</p>}
               </div>
-              {score && <ScoreBreakdown score={score} />}
+              {myReview?.score && myReview.reportVersion === r.version ? (
+                <><p className="text-xs font-medium text-navy-500">Skor menurut pemeriksaan perusahaan Anda</p><ScoreBreakdown score={myReview.score} /></>
+              ) : score && <ScoreBreakdown score={score} />}
               {emission && <EmissionBreakdown e={emission} />}
               <MethodNote />
             </div>
@@ -110,8 +114,8 @@ export default function ReviewPage() {
             <aside className="space-y-4">
               <div className="rounded-2xl border border-line bg-white p-4 shadow-[var(--shadow-card)]">
                 <h2 className="text-sm font-semibold">Pemeriksaan & keputusan</h2>
-                {r.status !== "submitted" ? (
-                  <p className="mt-2 text-sm text-navy-500">Laporan ini tidak sedang menunggu verifikasi.</p>
+                {r.status !== "submitted" || myStatus !== "pending" ? (
+                  <p className="mt-2 text-sm text-navy-500">{r.status !== "submitted" ? "Laporan ini tidak sedang menunggu verifikasi." : "Perusahaan Anda sudah memutuskan versi laporan ini."}</p>
                 ) : !claims.canVerify ? (
                   <p className="mt-2 text-sm text-navy-500">Akun Anda tidak memiliki akses peninjau.</p>
                 ) : (
@@ -146,7 +150,7 @@ export default function ReviewPage() {
                     </div>
                   </div>
                 )}
-                {msg && r.status !== "submitted" && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
+                {msg && (r.status !== "submitted" || myStatus !== "pending") && <div className="mt-3"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
               </div>
 
               <div className="rounded-2xl border border-line bg-white p-4">

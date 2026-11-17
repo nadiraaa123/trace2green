@@ -28,6 +28,11 @@ export function handleError(err: unknown) {
       { status: 400 },
     );
   }
+  if (err instanceof Error && err.message === "FIREBASE_SERVICE_ACCOUNT_KEY is not configured") {
+    // Deployment is missing server credentials: say so instead of a generic 500.
+    console.error(err.message);
+    return NextResponse.json({ error: "server_not_configured", message: "Server belum dikonfigurasi (kredensial Firebase belum diatur)." }, { status: 503 });
+  }
   console.error(err);
   return NextResponse.json({ error: "internal", message: "Terjadi kesalahan server." }, { status: 500 });
 }

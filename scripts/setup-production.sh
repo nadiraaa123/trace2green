@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# One-time production setup using the existing scripts. Run on YOUR machine:
+# One-time production setup using the existing scripts. Run on YOUR machine
+# (Linux, macOS, or Git Bash on Windows):
 #   bash scripts/setup-production.sh /path/to/service-account.json <firebase-project-id> <admin-email-A> <admin-email-B>
 # - Never prints or stores the key; it lives only in this shell's environment.
 # - Asks before every write. Seed is idempotent and never overwrites trial data.
@@ -10,16 +11,24 @@ KEY_FILE="${1:?service-account.json path}"; PROJECT="${2:?firebase project id}";
 node -e 'process.exit(+process.versions.node.split(".")[0] >= 24 ? 0 : 1)' || { echo "Node 24 required (see .nvmrc)"; exit 1; }
 unset FIRESTORE_EMULATOR_HOST FIREBASE_AUTH_EMULATOR_HOST NEXT_PUBLIC_USE_FIREBASE_EMULATOR
 
-KEY_PROJECT=$(node -e 'console.log(require(require("path").resolve(process.argv[1])).project_id)' "$KEY_FILE")
+# Absolute path in the form Node understands (Windows path under Git Bash).
+KEY_ABS="$(cd "$(dirname "$KEY_FILE")" && pwd)/$(basename "$KEY_FILE")"
+if command -v cygpath >/dev/null 2>&1; then KEY_ABS="$(cygpath -w "$KEY_ABS")"; fi
+KEY_PROJECT=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).project_id)' "$KEY_ABS")
 echo "Service account project: $KEY_PROJECT   expected: $PROJECT"
 [ "$KEY_PROJECT" = "$PROJECT" ] || { echo "Project mismatch: the key belongs to another project. Stopping."; exit 1; }
-export GOOGLE_APPLICATION_CREDENTIALS="$(cd "$(dirname "$KEY_FILE")" && pwd)/$(basename "$KEY_FILE")"
+export GOOGLE_APPLICATION_CREDENTIALS="$KEY_ABS"
 export FIREBASE_SERVICE_ACCOUNT_KEY="$(base64 < "$KEY_FILE" | tr -d '\n')"
 export FIREBASE_PROJECT_ID="$PROJECT"
 ask() { read -r -p "$1 [y/N] " a; [ "$a" = "y" ] || [ "$a" = "Y" ]; }
 
 echo; echo "== 1/4 Deploy Firestore rules and indexes (replaces the project's current rules) =="
-ask "Deploy firestore.rules and firestore.indexes.json to $PROJECT?" && npx firebase deploy --only firestore:rules,firestore:indexes --project "$PROJECT" --non-interactive
+if ask "Deploy firestore.rules and firestore.indexes.json to $PROJECT?"; then
+  if ! npx firebase deploy --only firestore:rules,firestore:indexes --project "$PROJECT" --non-interactive; then
+    echo "Deploy failed. If it is a permission error, run:  npx firebase login   (your Google account), then re-run this script."
+    ask "Continue with the import anyway? (rules are NOT deployed yet)" || exit 1
+  fi
+fi
 
 echo; echo "== 2/4 Import simulated workbook (dry run first) =="
 npx tsx scripts/seed.ts --dry-run

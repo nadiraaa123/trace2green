@@ -21,7 +21,10 @@ Cloud Storage. Never commit keys; set them only as environment variables.
    cp .firebaserc.example .firebaserc   # set your project id
    npx firebase deploy --only firestore:rules,firestore:indexes
    ```
-7. Seed the simulated workbook and create company accounts (from your machine):
+7. **One command for steps 6–7 (recommended):** `bash scripts/setup-production.sh /path/to/service-account.json <project-id> <admin-email-A> <admin-email-B>`
+   — checks the key belongs to `<project-id>`, asks before each write, dry-runs the
+   import, generates admin passwords locally, then runs a read-only verification
+   (`scripts/verify-production.ts`). Manual equivalent:
    ```bash
    export FIREBASE_SERVICE_ACCOUNT_KEY=$(base64 -w0 service-account.json)
    npm run seed -- --confirm-production

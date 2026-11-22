@@ -1,6 +1,7 @@
 "use client";
 import { useCompany } from "@/components/company/CompanyContext";
 import { EmissionBars, ScoreDonut, TrendChart } from "@/components/company/charts";
+import { EmisiTabs } from "@/components/company/EmisiTabs";
 import { PageTop } from "@/components/company/Shell";
 import { EmptyNote, MethodBadges, Panel, SourceBadge, fmt, pct, tco2 } from "@/components/company/ui";
 import { filterRows, kpis, kpisFor, type Source } from "@/lib/kpi";
@@ -38,6 +39,21 @@ export default function EmissionsScorePage() {
   return (
     <>
       <PageTop title="Emisi & Skor" subtitle={`Estimasi emisi dan penilaian pemasok · ${formatPeriod(c.period!)}`} />
+      <EmisiTabs />
+      <Panel title="Skor Rata-rata" subtitle="Dihitung terpisah per sumber data karena metodenya berbeda" className="mb-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {groups.map((k) => (
+            <div key={k.source} className="rounded-xl border border-line p-4" data-testid={`avg-score-${k.source}`}>
+              <SourceBadge source={k.source} />
+              <p className="mt-2 text-3xl font-semibold">{k.avgScore == null ? "—" : `${fmt(k.avgScore, 1)}`}<span className="text-sm font-normal text-navy-500">{k.avgScore == null ? "" : "/100"}</span></p>
+              <p className="text-xs text-navy-500">
+                {k.avgScore == null ? `Belum ada skor akhir (${k.unscored} laporan masih sementara)` : `dari ${k.scored} laporan${k.unscored ? ` · ${k.unscored} belum punya skor akhir` : ""}`}
+                {k.source === "demo" ? " · skor asli workbook simulasi" : " · skor mesin Trace2Green"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Panel>
       <div className="grid gap-5 xl:grid-cols-3">
         <Panel title="Tren Estimasi Emisi" subtitle="Total kg CO₂e laporan masuk per bulan (sumber terpisah)" className="xl:col-span-2">
           <TrendChart data={trend} sources={sources} unit="kg" />

@@ -6,10 +6,15 @@ import { CATEGORIES, SOURCE_LABEL, type Source } from "@/lib/kpi";
 import { CATEGORY_LABEL } from "@/lib/report";
 import { SOURCE_COLOR, STATUS_COLOR } from "./ui";
 
+/** A chart series: one data source, or "all" for the unified (combined) view. */
+type Series = Source | "all";
+const COLOR: Record<Series, string> = { ...SOURCE_COLOR, all: "#168B73" };
+const LABEL: Record<Series, string> = { ...SOURCE_LABEL, all: "Semua pemasok" };
+
 const AXIS = { stroke: "#a3afc0", fontSize: 11, tickLine: false, axisLine: false } as const;
 const TT = { contentStyle: { borderRadius: 12, border: "1px solid #e3e9ef", fontSize: 12 }, cursor: { stroke: "#d1ebe0", strokeWidth: 1 } };
 
-export function TrendChart({ data, sources, unit = "%" }: { data: Record<string, number | string | null>[]; sources: Source[]; unit?: string }) {
+export function TrendChart({ data, sources, unit = "%" }: { data: Record<string, number | string | null>[]; sources: Series[]; unit?: string }) {
   return (
     <div className="h-56">
       <ResponsiveContainer width="100%" height="100%">
@@ -17,10 +22,10 @@ export function TrendChart({ data, sources, unit = "%" }: { data: Record<string,
           <CartesianGrid stroke="#eef2f6" vertical={false} />
           <XAxis dataKey="label" {...AXIS} />
           <YAxis {...AXIS} domain={unit === "%" ? [0, 100] : ["auto", "auto"]} tickFormatter={(v) => `${v}${unit === "%" ? "%" : ""}`} />
-          <Tooltip {...TT} formatter={(v, n) => [v == null ? "—" : `${Number(v).toLocaleString("id-ID", { maximumFractionDigits: 1 })}${unit === "%" ? "%" : ` ${unit}`}`, SOURCE_LABEL[n as Source] ?? n]} />
-          {sources.length > 1 && <Legend formatter={(v) => SOURCE_LABEL[v as Source]} iconType="circle" wrapperStyle={{ fontSize: 12 }} />}
+          <Tooltip {...TT} formatter={(v, n) => [v == null ? "—" : `${Number(v).toLocaleString("id-ID", { maximumFractionDigits: 1 })}${unit === "%" ? "%" : ` ${unit}`}`, LABEL[n as Series] ?? n]} />
+          {sources.length > 1 && <Legend formatter={(v) => LABEL[v as Series]} iconType="circle" wrapperStyle={{ fontSize: 12 }} />}
           {sources.map((s) => (
-            <Line key={s} type="monotone" dataKey={s} stroke={SOURCE_COLOR[s]} strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={false} />
+            <Line key={s} type="monotone" dataKey={s} stroke={COLOR[s]} strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: "#fff" }} activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={false} />
           ))}
         </LineChart>
       </ResponsiveContainer>
@@ -61,9 +66,11 @@ export function ScoreDonut({ counts, title }: { counts: { HIJAU: number; KUNING:
   );
 }
 
-/** Categories on the axis (labels carry identity); one bar per source. Values in kg CO2e. */
-export function EmissionBars({ bySource, sources }: { bySource: Record<Source, Record<string, number>>; sources: Source[] }) {
-  const data = CATEGORIES.map((c) => ({ label: CATEGORY_LABEL[c].replace(" (BBM/LPG)", "").replace(" pengiriman", ""), ...Object.fromEntries(sources.map((s) => [s, Math.round(bySource[s]?.[c] ?? 0)])) }));
+/** Categories on the axis (labels carry identity); one bar per series. Values in kg CO2e. */
+export function EmissionBars({ bySource, sources, sortDesc = false }: { bySource: Partial<Record<Series, Record<string, number>>>; sources: Series[]; sortDesc?: boolean }) {
+  let data = CATEGORIES.map((c) => ({ label: CATEGORY_LABEL[c].replace(" (BBM/LPG)", "").replace(" pengiriman", ""), ...Object.fromEntries(sources.map((s) => [s, Math.round(bySource[s]?.[c] ?? 0)])) }));
+  const total = (row: Record<string, string | number>) => sources.reduce((t, s) => t + Number(row[s] ?? 0), 0);
+  if (sortDesc) data = [...data].sort((a, b) => total(b) - total(a));
   return (
     <div className="h-60">
       <ResponsiveContainer width="100%" height="100%">
@@ -71,9 +78,9 @@ export function EmissionBars({ bySource, sources }: { bySource: Record<Source, R
           <CartesianGrid stroke="#eef2f6" horizontal={false} />
           <XAxis type="number" {...AXIS} tickFormatter={(v) => `${(v / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 })} t`} />
           <YAxis type="category" dataKey="label" {...AXIS} width={92} />
-          <Tooltip {...TT} cursor={{ fill: "#f7fafc" }} formatter={(v, n) => [`${Number(v).toLocaleString("id-ID")} kg CO₂e`, SOURCE_LABEL[n as Source]]} />
-          {sources.length > 1 && <Legend formatter={(v) => SOURCE_LABEL[v as Source]} iconType="circle" wrapperStyle={{ fontSize: 12 }} />}
-          {sources.map((s) => <Bar key={s} dataKey={s} fill={SOURCE_COLOR[s]} radius={[0, 4, 4, 0]} barSize={sources.length > 1 ? 9 : 14} isAnimationActive={false} />)}
+          <Tooltip {...TT} cursor={{ fill: "#f7fafc" }} formatter={(v, n) => [`${Number(v).toLocaleString("id-ID")} kg CO₂e`, LABEL[n as Series]]} />
+          {sources.length > 1 && <Legend formatter={(v) => LABEL[v as Series]} iconType="circle" wrapperStyle={{ fontSize: 12 }} />}
+          {sources.map((s) => <Bar key={s} dataKey={s} fill={COLOR[s]} radius={[0, 4, 4, 0]} barSize={sources.length > 1 ? 9 : 16} isAnimationActive={false} />)}
         </BarChart>
       </ResponsiveContainer>
     </div>

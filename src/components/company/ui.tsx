@@ -116,3 +116,17 @@ export function MethodBadges() {
     </p>
   );
 }
+
+/** Simple KPI tile: one main number and a short label. */
+export function StatCard({ icon: Icon, label, value, hint, testId }: { icon: LucideIcon; label: string; value: string; hint?: string; testId?: string }) {
+  return (
+    <div className="rounded-2xl border border-line bg-white p-5 shadow-[var(--shadow-card)]" data-testid={testId}>
+      <div className="flex items-center gap-2.5 text-sm font-medium text-navy-500">
+        <span className="inline-flex size-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><Icon className="size-[18px]" /></span>
+        {label}
+      </div>
+      <p className="mt-4 text-3xl font-semibold tracking-tight text-navy-900">{value}</p>
+      {hint && <p className="mt-1 text-sm text-navy-500">{hint}</p>}
+    </div>
+  );
+}

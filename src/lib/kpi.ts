@@ -165,3 +165,49 @@ export function completionTrend(periods: { period: string; rows: StatsRow[] }[],
     return Math.round(k.completionRate * 1000) / 10;
   });
 }
+
+/**
+ * Unified operational view (dashboard home). Only ADDITIVE quantities are combined
+ * across sources — supplier counts, report counts, emission totals, category counts.
+ * Scores are never averaged across sources (different methodologies); per-source
+ * breakdowns stay available on the detail pages.
+ */
+export interface CombinedKpis {
+  related: number; consented: number; expected: number; received: number; attention: number;
+  emissionsKg: number; byCategory: Record<ActivityCategory, number>;
+  colors: { HIJAU: number; KUNING: number; MERAH: number; none: number };
+  hasDemo: boolean; hasTrial: boolean;
+}
+
+export function combinedKpis(rows: StatsRow[]): CombinedKpis {
+  const d = kpisFor(rows, "demo");
+  const t = kpisFor(rows, "trial");
+  const byCategory = Object.fromEntries(CATEGORIES.map((c) => [c, d.emissions.byCategory[c] + t.emissions.byCategory[c]])) as Record<ActivityCategory, number>;
+  return {
+    related: d.related + t.related, consented: d.consented + t.consented, expected: d.consented + t.consented,
+    received: d.received + t.received, attention: d.attention + t.attention,
+    emissionsKg: d.emissions.totalKg + t.emissions.totalKg, byCategory,
+    colors: { HIJAU: d.colors.HIJAU + t.colors.HIJAU, KUNING: d.colors.KUNING + t.colors.KUNING, MERAH: d.colors.MERAH + t.colors.MERAH, none: d.colors.none + t.colors.none },
+    hasDemo: d.related > 0, hasTrial: t.related > 0,
+  };
+}
+
+/**
+ * Share of suppliers that sent a report, per period, across sources — each source
+ * counted only inside its own reporting window (see completionTrend), so a source
+ * that has no data for a month never pulls the line down to a fabricated 0%.
+ */
+export function combinedCompletionTrend(periods: { period: string; rows: StatsRow[] }[]): (number | null)[] {
+  const windows = { demo: completionTrend(periods, "demo"), trial: completionTrend(periods, "trial") };
+  return periods.map((p, i) => {
+    let received = 0;
+    let consented = 0;
+    for (const s of ["demo", "trial"] as const) {
+      if (windows[s][i] == null) continue;
+      const k = kpisFor(p.rows, s);
+      received += k.received;
+      consented += k.consented;
+    }
+    return consented ? Math.round((received / consented) * 1000) / 10 : null;
+  });
+}

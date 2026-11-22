@@ -105,7 +105,7 @@ const shots = process.env.SHOTS_DIR;
   await c.getByRole("button", { name: "Masuk" }).click();
   await c.waitForURL("**/c");
   await c.getByText("Perusahaan Mitra A", { exact: true }).waitFor();
-  await c.getByTestId("kpi-suppliers-demo").getByText("3", { exact: true }).waitFor(); // dashboard summary: 3 related suppliers
+  await c.getByTestId("kpi-suppliers").getByText("3", { exact: true }).waitFor(); // dashboard summary: 3 related suppliers
   ok("company admin sees own company and its 3 related suppliers");
   await c.goto(BASE + "/s");
   await c.waitForURL("**/c");

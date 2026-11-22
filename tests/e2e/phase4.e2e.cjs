@@ -13,6 +13,8 @@ async function login(page, email) {
   await page.getByRole("button", { name: "Masuk" }).click();
   await page.waitForURL("**/c");
 }
+// Next keeps hidden copies of visited pages; only click the visible filter button.
+const pick = (page, label) => page.locator("button:visible").filter({ hasText: new RegExp(`^${label}$`) }).first().click();
 const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaan" }).getByRole("link", { name }).click();
 
 (async () => {
@@ -25,16 +27,22 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   // 1. Seeded dashboard
   await login(c, "reviewer@mitra-a.test");
   await c.getByRole("heading", { name: "Ringkasan" }).waitFor();
-  await c.getByTestId("kpi-completion-demo").getByText(`${E.received} dari 50 laporan masuk`).waitFor();
-  await c.getByTestId("kpi-score-demo").getByText(`${E.avg}/100`).waitFor();
-  await c.getByTestId("kpi-emission-demo").getByText(`${E.tco2} tCO₂e`).waitFor();
-  await c.getByTestId("kpi-completion-trial").getByText("0 dari 0 laporan masuk").waitFor();
+  await c.getByTestId("kpi-suppliers").getByText("50", { exact: true }).waitFor();
+  await c.getByTestId("kpi-reports").getByText(`${E.received} dari 50`).waitFor();
+  await c.getByTestId("kpi-emission").getByText(`${E.tco2} ton CO₂e`).waitFor();
+  await c.getByTestId("demo-note").getByText("Dashboard demonstrasi — mencakup data simulasi dan uji coba.").waitFor();
+  if (await c.getByRole("button", { name: "Simulasi", exact: true }).count()) throw new Error("dashboard must not show the source filter");
   if (shots) await c.screenshot({ path: `${shots}/p4-01-overview-seeded.png`, fullPage: true });
   ok("overview renders seeded KPIs equal to the workbook (Simulasi and Trial shown separately)");
-  await c.getByRole("button", { name: "Simulasi", exact: true }).click();
-  if (await c.getByTestId("kpi-completion-trial").count()) throw new Error("trial group should be hidden under Simulasi filter");
-  await c.getByRole("button", { name: "Semua", exact: true }).click();
-  ok("source filter Semua / Simulasi switches groups without blending");
+  await nav(c, "Emisi & Skor");
+  await c.getByTestId("avg-score-demo").getByText(`${E.avg}`).waitFor(); // averages moved here, per source
+  await c.getByTestId("avg-score-trial").getByText("—").waitFor();
+  await c.getByRole("link", { name: "Cara Penilaian" }).click();
+  await c.getByTestId("example").getByText("81").waitFor();
+  await c.getByTestId("disclaimer").waitFor();
+  if (shots) await c.screenshot({ path: `${shots}/p5-02-cara-penilaian.png`, fullPage: true });
+  await nav(c, "Ringkasan");
+  ok("simple unified KPIs + demo note on dashboard; per-source averages and scoring method on Emisi & Skor");
 
   // 2. Suppliers directory
   await nav(c, "Pemasok");
@@ -74,7 +82,8 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   await p.getByRole("button", { name: "Hubungkan" }).click();
   await p.getByText("Terhubung dengan Perusahaan Mitra A.").waitFor();
   // Laptop updates live: one trial supplier, nothing received yet
-  await c.getByTestId("kpi-completion-trial").getByText("0 dari 1 laporan masuk").waitFor({ timeout: 15000 });
+  await c.getByTestId("kpi-reports").getByText(`${E.received} dari 51`).waitFor({ timeout: 15000 });
+  await c.getByTestId("kpi-suppliers").getByText("51", { exact: true }).waitFor();
   ok("new supplier appears on the laptop dashboard live after connecting");
 
   await p.goto(BASE + "/s/laporan/baru");
@@ -102,16 +111,13 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   ok("supplier submitted March 2027 from the phone");
 
   // 5–6. Laptop: live update, Trial filter, demo untouched
-  await c.getByTestId("kpi-completion-trial").getByText("1 dari 1 laporan masuk").waitFor({ timeout: 15000 });
-  await c.getByTestId("kpi-verification-trial").getByText("0/1").waitFor();
-  await c.getByTestId("recent-activity").getByText(/SUP-101.*mengirim laporan/).waitFor({ timeout: 15000 });
-  await c.getByTestId("kpi-completion-demo").getByText(`${E.received} dari 50 laporan masuk`).waitFor();
-  await c.getByTestId("kpi-score-demo").getByText(`${E.avg}/100`).waitFor();
+  await c.getByTestId("kpi-reports").getByText(`${E.received + 1} dari 51`).waitFor({ timeout: 15000 });
+  await c.getByTestId("recent-activity").getByText(/Roti Rina mengirim laporan Maret 2027/).waitFor({ timeout: 15000 });
   if (shots) await c.screenshot({ path: `${shots}/p4-03-overview-live.png`, fullPage: true });
   ok("dashboard updated without refresh; simulated KPIs unchanged");
   await nav(c, "Pemasok");
   await c.getByLabel("Cari pemasok").fill(""); // the page keeps its earlier search when revisited
-  await c.getByRole("button", { name: "Trial", exact: true }).click();
+  await pick(c, "Trial");
   await c.getByText("1 pemasok · halaman 1 dari 1").waitFor();
   await c.getByTestId("supplier-table").getByText("SUP-101").waitFor();
   await c.getByTestId("supplier-table").getByText("Menunggu Verifikasi").waitFor();
@@ -125,7 +131,7 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   const lapB = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const b = await lapB.newPage();
   await login(b, "reviewer@mitra-b.test");
-  await b.getByTestId("kpi-completion-trial").getByText("0 dari 0 laporan masuk").waitFor();
+  await b.getByTestId("kpi-suppliers").getByText("50", { exact: true }).waitFor(); // B does not gain A's new supplier
   await nav(b, "Verifikasi");
   await b.getByText("Tidak ada laporan yang menunggu verifikasi.").waitFor();
   await b.goto(BASE + "/c/pemasok/SUP-101");
@@ -133,7 +139,6 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   ok("company B cannot see the supplier, its report or its queue item");
 
   // 8. Reviewer A decides
-  await c.getByRole("button", { name: "Semua", exact: true }).click();
   await nav(c, "Verifikasi");
   await c.getByTestId("table-queue").getByText("Roti Rina").waitFor();
   await c.getByRole("link", { name: "Tinjau" }).click();
@@ -160,8 +165,20 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
 
   // 10. Analytics reflect the new record; demo values intact; CSV export
   await nav(c, "Ringkasan");
-  await c.getByTestId("kpi-verification-trial").getByText("1/1").waitFor({ timeout: 15000 });
-  await c.getByTestId("kpi-score-demo").getByText(`${E.avg}/100`).waitFor();
+  await nav(c, "Verifikasi");
+  await c.getByTestId("verification-summary").getByText("Terverifikasi").waitFor();
+  await c.getByTestId("verification-summary").locator("div", { hasText: "Terverifikasi" }).getByText("1", { exact: true }).waitFor({ timeout: 15000 });
+  // Fresh page loads (no hidden copies of earlier pages kept by the client router).
+  await c.goto(BASE + "/c/emisi-skor");
+  await pick(c, "Semua"); // the Trial filter chosen earlier persists on detail pages
+  await c.getByTestId("avg-score-demo").getByText(`${E.avg}`).waitFor(); // simulated average unchanged
+  await c.goto(BASE + "/c/pemasok/SUP-101");
+  await c.getByRole("link", { name: "Rincian skor" }).click();
+  await c.getByTestId("components").getByText("Kecocokan Bukti").waitFor();
+  await c.getByText("Diperiksa: 390 kWh (Dokumen asli diperiksa langsung) → cocok").waitFor();
+  await c.getByText("benchmark simulasi — hanya demonstrasi", { exact: false }).waitFor();
+  if (await c.getByTestId("suggestions").getByText("Siapkan tagihan listrik", { exact: false }).count()) throw new Error("stale evidence suggestion after a matching check");
+  if (shots) await c.screenshot({ path: `${shots}/p5-03-score-detail.png`, fullPage: true });
   await nav(c, "Laporan");
   const [dl] = await Promise.all([c.waitForEvent("download"), c.getByTestId("csv-export").click()]);
   const csv = fs.readFileSync(await dl.path(), "utf8");

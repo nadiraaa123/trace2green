@@ -50,6 +50,14 @@ export default function VerificationPage() {
   return (
     <>
       <PageTop title="Verifikasi" subtitle="Keputusan verifikasi berlaku untuk perusahaan Anda saja. Data simulasi tidak masuk alur ini." period={false} source={false} />
+      <div className="mb-5 grid gap-3 sm:grid-cols-4" data-testid="verification-summary">
+        {([["Menunggu", queue.length], ["Terverifikasi", [...reviews.values()].filter((v) => v.status === "verified").length],
+          ["Ditolak", [...reviews.values()].filter((v) => v.status === "rejected").length], ["Diminta perbaikan", revision.length]] as const).map(([label, n]) => (
+          <div key={label} className="rounded-2xl border border-line bg-white p-4 shadow-[var(--shadow-card)]">
+            <p className="text-sm text-navy-500">{label}</p><p className="mt-1 text-2xl font-semibold">{n}</p>
+          </div>
+        ))}
+      </div>
       {!claims.canVerify && <div className="mb-4 max-w-xl"><Alert tone="info">Akun Anda hanya dapat melihat. Keputusan memerlukan akses peninjau.</Alert></div>}
       {error && <div className="mb-4"><Alert>Gagal memuat ({error}).</Alert></div>}
       <div role="tablist" className="mb-4 flex flex-wrap gap-2">

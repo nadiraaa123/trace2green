@@ -213,3 +213,31 @@ describe("trend honesty", () => {
     expect(completionTrend(periods, "trial")).toEqual([null, null, 100, 0]); // a real miss after the first report counts
   });
 });
+
+describe("unified dashboard view", () => {
+  const mk = (source: "demo" | "trial", status: string, extra: Partial<StatsRow> = {}): StatsRow => ({ supplierId: Math.random().toString(), name: "x", sector: null, region: null, source, critical: false, consent: true,
+    reportStatus: status as StatsRow["reportStatus"], reportVersion: null, reviewStatus: null, evidenceCount: null, final: null, color: null, scoreBasis: null, benchmarkBasis: null,
+    completeness: null, evidence: null, intensity: null, intensityRatio: null, totalKg: null, totalStatus: null, byCategory: null, blankAsZero: [], kwh: null, ...extra });
+  it("combines only additive quantities and never averages scores", async () => {
+    const { combinedKpis } = await import("@/lib/kpi");
+    const rows = [
+      mk("demo", "imported_simulated", { final: 80, color: "HIJAU", totalKg: 100, totalStatus: "workbook", byCategory: { listrik: 60, bbm: 40, kemasan: 0, limbah: 0, transportasi: 0 } }),
+      mk("demo", "missing"),
+      mk("trial", "submitted", { totalKg: 50, totalStatus: "partial", byCategory: { listrik: 50, bbm: 0, kemasan: null, limbah: null, transportasi: null } }),
+    ];
+    const k = combinedKpis(rows);
+    expect(k).toMatchObject({ related: 3, expected: 3, received: 2, emissionsKg: 150, hasDemo: true, hasTrial: true });
+    expect(k.byCategory.listrik).toBe(110);
+    expect(k.colors).toEqual({ HIJAU: 1, KUNING: 0, MERAH: 0, none: 1 });
+    expect(Object.keys(k)).not.toContain("avgScore");
+  });
+  it("combined trend counts each source only inside its own window", async () => {
+    const { combinedCompletionTrend } = await import("@/lib/kpi");
+    const periods = [
+      { period: "2027-01", rows: [mk("demo", "imported_simulated"), mk("demo", "missing"), mk("trial", "missing")] },
+      { period: "2027-03", rows: [mk("demo", "imported_simulated"), mk("demo", "imported_simulated"), mk("trial", "submitted")] },
+    ];
+    // Jan: trial has no report yet → only demo counts (1/2), not 1/3.
+    expect(combinedCompletionTrend(periods)).toEqual([50, 100]);
+  });
+});

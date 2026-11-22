@@ -108,8 +108,7 @@ async function register(page, { name, business, email, wa, invite }) {
   const c = await lapA.newPage();
   await login(c, "reviewer@mitra-a.test");
   await c.waitForURL("**/c");
-  await c.getByTestId("kpi-completion-demo").getByText(/dari 50 laporan masuk/).waitFor();
-  await c.getByTestId("kpi-completion-trial").getByText("1 dari 1 laporan masuk").waitFor();
+  await c.getByTestId("kpi-reports").getByText("48 dari 51").waitFor(); // 47/50 simulated + 1/1 live, shown together
   await c.goto(BASE + "/c/verifikasi");
   await c.getByText("Roti Rina").waitFor();
   if ((await c.locator("tbody tr").count()) !== 1) throw new Error("queue should hold only the live report");

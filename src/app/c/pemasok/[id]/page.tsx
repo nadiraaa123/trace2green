@@ -69,7 +69,10 @@ export default function SupplierDetailPage() {
                   <td className="py-2.5 pr-3">{r!.evidence ? EVIDENCE[r!.evidence] : "—"}</td>
                   <td className="py-2.5 pr-3 text-right">{fmt(r!.kwh)}</td>
                   <td className="py-2.5 pr-3 text-right">{r!.totalKg == null ? "—" : fmt(r!.totalKg)}{r!.blankAsZero.length > 0 && <span className="ml-1 text-[11px] text-violet-700" title={`Sel kosong dihitung 0 oleh workbook: ${r!.blankAsZero.join(", ")}`}>*</span>}{r!.totalStatus === "partial" && <span className="ml-1 text-xs text-amber-700">(sebagian)</span>}</td>
-                  <td className="py-2.5 text-right">{r!.source === "trial" && ["submitted", "revision_requested"].includes(r!.reportStatus) && <Link href={`/c/verifikasi/${id}_${period}`} className="text-xs font-medium text-brand-600">Tinjau</Link>}</td>
+                  <td className="space-x-3 py-2.5 text-right whitespace-nowrap">
+                    {["submitted", "revision_requested", "imported_simulated"].includes(r!.reportStatus) && <Link href={`/c/pemasok/${id}/${period}`} className="text-xs font-medium text-brand-600">Rincian skor</Link>}
+                    {r!.source === "trial" && ["submitted", "revision_requested"].includes(r!.reportStatus) && <Link href={`/c/verifikasi/${id}_${period}`} className="text-xs font-medium text-brand-600">Tinjau</Link>}
+                  </td>
                 </tr>
               ))}
             </tbody>

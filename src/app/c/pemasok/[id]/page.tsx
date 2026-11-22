@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCompany } from "@/components/company/CompanyContext";
 import { TrendChart } from "@/components/company/charts";
-import { ColorPill, EmptyNote, MethodBadges, Panel, ReportPill, ReviewPill, SourceBadge, fmt, pct } from "@/components/company/ui";
+import { ColorPill, EmptyNote, MethodBadges, Panel, ReportPill, ReviewPill, SimTag, fmt, pct } from "@/components/company/ui";
 import { formatPeriod, shortPeriod } from "@/lib/period";
 import type { SupplierDoc } from "@/lib/types";
 import { useDoc } from "@/lib/useDoc";
@@ -24,15 +24,15 @@ export default function SupplierDetailPage() {
     return (<><Link href="/c/pemasok" className="inline-flex items-center gap-1 text-sm text-navy-500"><ArrowLeft className="size-4" /> Pemasok</Link>
       <div className="mt-4"><EmptyNote>Pemasok ini tidak terhubung dengan perusahaan Anda.</EmptyNote></div></>);
   }
-  const scoreTrend = history.map((h) => ({ label: shortPeriod(h.period), [source]: h.row!.final }));
-  const emissionTrend = history.map((h) => ({ label: shortPeriod(h.period), [source]: h.row!.totalKg == null ? null : Math.round(h.row!.totalKg) }));
+  const scoreTrend = history.map((h) => ({ label: shortPeriod(h.period), all: h.row!.final }));
+  const emissionTrend = history.map((h) => ({ label: shortPeriod(h.period), all: h.row!.totalKg == null ? null : Math.round(h.row!.totalKg) }));
 
   return (
     <>
       <Link href="/c/pemasok" className="inline-flex items-center gap-1 text-sm text-navy-500 hover:text-navy-900"><ArrowLeft className="size-4" /> Pemasok</Link>
       <div className="mt-3 mb-6 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">{s?.businessName ?? latest?.name}</h1>
-        {latest && <SourceBadge source={latest.source} />}
+        {latest && <SimTag source={latest.source} />}
         {latest?.critical && <span className="rounded bg-red-50 px-1.5 py-0.5 text-xs font-semibold text-risk">Pemasok kritis</span>}
       </div>
       <div className="grid gap-5 lg:grid-cols-3">
@@ -47,7 +47,7 @@ export default function SupplierDetailPage() {
           </dl>
         </Panel>
         <Panel title="Riwayat Skor" subtitle={source === "demo" ? "Skor workbook simulasi" : "Hanya bulan dengan skor akhir lengkap"} className="lg:col-span-2">
-          {history.some((h) => h.row!.final != null) ? <TrendChart data={scoreTrend} sources={[source]} unit="" /> : <EmptyNote>Belum ada skor akhir.</EmptyNote>}
+          {history.some((h) => h.row!.final != null) ? <TrendChart data={scoreTrend} sources={["all"]} unit="" /> : <EmptyNote>Belum ada skor akhir.</EmptyNote>}
         </Panel>
       </div>
       <Panel title="Riwayat Pelaporan & Kinerja Lingkungan" className="mt-5">
@@ -81,7 +81,7 @@ export default function SupplierDetailPage() {
         <p className="mt-3 text-[11px] text-navy-500">* sel kosong yang dihitung 0 oleh workbook simulasi (nilai asli dipertahankan).</p>
       </Panel>
       <Panel title="Tren Estimasi Emisi" subtitle="kg CO₂e per bulan" className="mt-5">
-        {history.some((h) => h.row!.totalKg != null) ? <TrendChart data={emissionTrend} sources={[source]} unit="kg" /> : <EmptyNote>Belum ada estimasi emisi.</EmptyNote>}
+        {history.some((h) => h.row!.totalKg != null) ? <TrendChart data={emissionTrend} sources={["all"]} unit="kg" /> : <EmptyNote>Belum ada estimasi emisi.</EmptyNote>}
         <MethodBadges />
       </Panel>
     </>

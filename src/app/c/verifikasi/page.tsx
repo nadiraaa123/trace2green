@@ -49,7 +49,7 @@ export default function VerificationPage() {
 
   return (
     <>
-      <PageTop title="Verifikasi" subtitle="Keputusan verifikasi berlaku untuk perusahaan Anda saja. Data simulasi tidak masuk alur ini." period={false} source={false} />
+      <PageTop title="Verifikasi" subtitle="Keputusan verifikasi berlaku untuk perusahaan Anda saja. Data simulasi tidak masuk alur ini." period={false} />
       <div className="mb-5 grid gap-3 sm:grid-cols-4" data-testid="verification-summary">
         {([["Menunggu", queue.length], ["Terverifikasi", [...reviews.values()].filter((v) => v.status === "verified").length],
           ["Ditolak", [...reviews.values()].filter((v) => v.status === "rejected").length], ["Diminta perbaikan", revision.length]] as const).map(([label, n]) => (

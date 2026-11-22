@@ -28,7 +28,7 @@ export default function ScoringMethodPage() {
 
   return (
     <>
-      <PageTop title="Emisi & Skor" subtitle="Cara Trace2Green menilai pemasok" period={false} source={false} />
+      <PageTop title="Emisi & Skor" subtitle="Cara Trace2Green menilai pemasok" period={false} />
       <EmisiTabs />
 
       <div className="grid gap-5 lg:grid-cols-3">

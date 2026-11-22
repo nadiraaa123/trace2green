@@ -1,6 +1,6 @@
 "use client";
 import { clsx } from "clsx";
-import { BarChart3, ClipboardCheck, Database, FileText, LayoutDashboard, Lightbulb, LogOut, Menu, Settings, Users, X } from "lucide-react";
+import { BarChart3, ClipboardCheck, Database, FileText, Info, LayoutDashboard, Lightbulb, LogOut, Menu, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -8,7 +8,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { DemoDateBanner } from "@/components/DemoDateBanner";
 import { LogoMark } from "@/components/ui/Logo";
 import { formatPeriod } from "@/lib/period";
-import type { SourceFilter } from "@/lib/kpi";
 import { useCompany } from "./CompanyContext";
 
 const NAV = [
@@ -20,10 +19,6 @@ const NAV = [
   { href: "/c/laporan", label: "Laporan", icon: FileText },
   { href: "/c/insight", label: "Insight & Rekomendasi", icon: Lightbulb },
   { href: "/c/pengaturan", label: "Pengaturan", icon: Settings },
-];
-
-const SOURCES: { key: SourceFilter; label: string }[] = [
-  { key: "all", label: "Semua" }, { key: "demo", label: "Simulasi" }, { key: "trial", label: "Trial" },
 ];
 
 export function CompanyShell({ children }: { children: React.ReactNode }) {
@@ -65,14 +60,26 @@ export function CompanyShell({ children }: { children: React.ReactNode }) {
           <Menu className="size-4" /> Menu
         </button>
         <div className="no-print"><DemoDateBanner /></div>
+        <DemoDisclosure />
         {children}
       </div>
     </div>
   );
 }
 
-/** Page title + the shared filter row (source + period). */
-export function PageTop({ title, subtitle, period = true, source = true, actions }: { title: string; subtitle?: string; period?: boolean; source?: boolean; actions?: React.ReactNode }) {
+/** One concise disclosure on every company page while simulated suppliers are shown. */
+function DemoDisclosure() {
+  const { hasDemo } = useCompany();
+  if (!hasDemo) return null;
+  return (
+    <p className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800" data-testid="demo-note">
+      <Info className="size-3.5" /> Dashboard demonstrasi — mencakup data simulasi dan uji coba. Pemasok simulasi ditandai “simulasi”.
+    </p>
+  );
+}
+
+/** Page title + period picker. All authorized suppliers are shown together (no source filter). */
+export function PageTop({ title, subtitle, period = true, actions }: { title: string; subtitle?: string; period?: boolean; actions?: React.ReactNode }) {
   const c = useCompany();
   return (
     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -81,16 +88,6 @@ export function PageTop({ title, subtitle, period = true, source = true, actions
         {subtitle && <p className="mt-1 text-sm text-navy-500">{subtitle}</p>}
       </div>
       <div className="flex flex-wrap items-center gap-2 no-print">
-        {source && (
-          <div role="group" aria-label="Sumber data" className="inline-flex rounded-xl border border-line bg-white p-1 text-sm">
-            {SOURCES.map((s) => (
-              <button key={s.key} aria-pressed={c.source === s.key} onClick={() => c.setSource(s.key)}
-                className={clsx("rounded-lg px-3 py-1.5 font-medium", c.source === s.key ? "bg-brand-500 text-white" : "text-navy-700 hover:bg-surface")}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
         {period && c.periods.length > 0 && (
           <select aria-label="Periode" value={c.period ?? ""} onChange={(e) => c.setPeriod(e.target.value)}
             className="h-10 rounded-xl border border-line bg-white px-3 text-sm font-medium">

@@ -5,7 +5,7 @@ import { collection, doc, limit, onSnapshot, orderBy, query, where } from "fireb
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { db } from "@/lib/firebase/client";
-import type { SourceFilter, StatsRow } from "@/lib/kpi";
+import type { StatsRow } from "@/lib/kpi";
 import type { CompanyDoc } from "@/lib/types";
 
 export interface PeriodDoc { period: string; rows: StatsRow[]; generatedAt?: unknown }
@@ -16,8 +16,8 @@ interface Ctx {
   periods: PeriodDoc[]; // oldest → newest
   loading: boolean;
   error: string | null;
-  source: SourceFilter;
-  setSource: (s: SourceFilter) => void;
+  /** True when the summaries include simulated (demo) suppliers → show the disclosure. */
+  hasDemo: boolean;
   period: string | null;
   setPeriod: (p: string) => void;
   current: PeriodDoc | null;
@@ -25,7 +25,6 @@ interface Ctx {
 }
 
 const C = createContext<Ctx | null>(null);
-const KEY = "t2g.company.source";
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { claims } = useAuth();
@@ -34,9 +33,6 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [periods, setPeriods] = useState<PeriodDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [source, setSourceState] = useState<SourceFilter>(() => {
-    try { const v = localStorage.getItem(KEY); return v === "demo" || v === "trial" || v === "all" ? v : "all"; } catch { return "all"; }
-  });
   const [chosen, setChosen] = useState<string | null>(null);
 
   useEffect(() => onSnapshot(doc(db, "companies", companyId), (s) => setCompany(s.exists() ? (s.data() as CompanyDoc) : null), () => setCompany(null)), [companyId]);
@@ -55,8 +51,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const idx = periods.findIndex((p) => p.period === period);
 
   const value: Ctx = {
-    companyId, company, periods, loading, error, source,
-    setSource: (s) => { setSourceState(s); try { localStorage.setItem(KEY, s); } catch { /* storage unavailable */ } },
+    companyId, company, periods, loading, error,
+    hasDemo: periods.some((p) => p.rows.some((r) => r.source === "demo")),
     period, setPeriod: setChosen,
     current: idx >= 0 ? periods[idx] : null,
     previous: idx > 0 ? periods[idx - 1] : null,

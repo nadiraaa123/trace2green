@@ -231,6 +231,23 @@ describe("unified dashboard view", () => {
     expect(k.colors).toEqual({ HIJAU: 1, KUNING: 0, MERAH: 0, none: 1 });
     expect(Object.keys(k)).not.toContain("avgScore");
   });
+  it("unified counts for every page: statuses, evidence, completeness bands, app verification", async () => {
+    const { combinedKpis, receivedRows } = await import("@/lib/kpi");
+    const rows = [
+      mk("demo", "imported_simulated", { completeness: 1, evidence: "match", totalKg: 10, totalStatus: "workbook" }),
+      mk("demo", "imported_simulated", { completeness: 0.5, evidence: "mismatch", totalKg: 5, totalStatus: "workbook" }),
+      mk("trial", "submitted", { completeness: 0.8, evidence: "unverifiable", reviewStatus: "verified", totalStatus: "unavailable" }),
+      mk("trial", "revision_requested"), // received, completeness unknown → "Belum Dinilai", not 0
+      mk("trial", "draft"), mk("trial", "missing"),
+      mk("trial", "submitted", { consent: false }), // no consent → excluded everywhere
+    ];
+    const k = combinedKpis(rows);
+    expect(k).toMatchObject({ related: 7, consented: 6, received: 4, missing: 1, draft: 1, revision: 1, appReceived: 2, verified: 1 });
+    expect(k.emissionStatus).toEqual({ workbook: 2, complete: 0, partial: 0, unavailable: 2 });
+    expect(k.evidence).toEqual({ match: 1, mismatch: 1, unverifiable: 1 });
+    expect(k.completeness).toEqual({ full: 1, partial: 1, low: 1, unknown: 1 });
+    expect(receivedRows(rows)).toHaveLength(4);
+  });
   it("combined trend counts each source only inside its own window", async () => {
     const { combinedCompletionTrend } = await import("@/lib/kpi");
     const periods = [

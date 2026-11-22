@@ -4,15 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCompany } from "@/components/company/CompanyContext";
 import { PageTop } from "@/components/company/Shell";
-import { ColorPill, EmptyNote, Panel, ReportPill, ReviewPill, SourceBadge, fmt } from "@/components/company/ui";
-import { filterRows, type RowReportStatus } from "@/lib/kpi";
+import { ColorPill, EmptyNote, Panel, ReportPill, ReviewPill, SimTag, fmt } from "@/components/company/ui";
+import type { RowReportStatus } from "@/lib/kpi";
 import { formatPeriod } from "@/lib/period";
 
 const PAGE = 10;
 
 export default function SuppliersPage() {
   const c = useCompany();
-  const rows = filterRows(c.current?.rows ?? [], c.source);
+  const rows = c.current?.rows ?? [];
   const [q, setQ] = useState("");
   const [sector, setSector] = useState("");
   const [region, setRegion] = useState("");
@@ -54,10 +54,10 @@ export default function SuppliersPage() {
         </div>
         {shown.length === 0 ? <EmptyNote>Tidak ada pemasok yang cocok dengan filter.</EmptyNote> : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-sm" data-testid="supplier-table">
+            <table className="w-full min-w-[780px] text-sm" data-testid="supplier-table">
               <thead className="text-left text-xs text-navy-500">
                 <tr className="border-b border-line">
-                  <th className="py-2 pr-3 font-medium">Pemasok</th><th className="py-2 pr-3 font-medium">Sumber</th><th className="py-2 pr-3 font-medium">Sektor</th>
+                  <th className="py-2 pr-3 font-medium">Pemasok</th><th className="py-2 pr-3 font-medium">Sektor</th>
                   <th className="py-2 pr-3 font-medium">Wilayah</th><th className="py-2 pr-3 font-medium">Laporan</th><th className="py-2 pr-3 font-medium">Skor</th>
                   <th className="py-2 pr-3 font-medium">Verifikasi Anda</th><th className="py-2 pr-3 text-right font-medium">Emisi (kg CO₂e)</th><th />
                 </tr>
@@ -65,8 +65,7 @@ export default function SuppliersPage() {
               <tbody className="divide-y divide-line">
                 {slice.map((r) => (
                   <tr key={r.supplierId} className="hover:bg-surface/60">
-                    <td className="py-2.5 pr-3"><p className="font-medium">{r.name}{r.critical && <span className="ml-1.5 rounded bg-red-50 px-1 text-[10px] font-semibold text-risk">KRITIS</span>}</p><p className="text-xs text-navy-500">{r.supplierId}</p></td>
-                    <td className="py-2.5 pr-3"><SourceBadge source={r.source} /></td>
+                    <td className="py-2.5 pr-3"><p className="font-medium">{r.name}<SimTag source={r.source} />{r.critical && <span className="ml-1.5 rounded bg-red-50 px-1 text-[10px] font-semibold text-risk">KRITIS</span>}</p><p className="text-xs text-navy-500">{r.supplierId}</p></td>
                     <td className="py-2.5 pr-3">{r.sector ?? "—"}</td>
                     <td className="py-2.5 pr-3">{r.region ?? "—"}</td>
                     <td className="py-2.5 pr-3"><ReportPill status={r.reportStatus} /></td>

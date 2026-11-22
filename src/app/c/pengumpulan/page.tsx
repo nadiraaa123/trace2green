@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useCompany } from "@/components/company/CompanyContext";
 import { PageTop } from "@/components/company/Shell";
-import { EmptyNote, Panel, ReportPill, SourceBadge, fmt, pct } from "@/components/company/ui";
+import { EmptyNote, Panel, ReportPill, SimTag, fmt, pct } from "@/components/company/ui";
 import { db } from "@/lib/firebase/client";
-import { filterRows, kpis, SOURCE_LABEL, type RowReportStatus } from "@/lib/kpi";
+import { combinedKpis, type RowReportStatus } from "@/lib/kpi";
 import { formatPeriod } from "@/lib/period";
 import type { ActivityData, MonthlyReportDoc } from "@/lib/types";
 
@@ -27,7 +27,7 @@ function cell(a: ActivityData, value: number | null, cat?: string) {
 
 export default function DataCollectionPage() {
   const c = useCompany();
-  const rows = filterRows(c.current?.rows ?? [], c.source);
+  const rows = c.current?.rows ?? [];
   const [tab, setTab] = useState<Tab>("received");
   const [sector, setSector] = useState("");
   const [reports, setReports] = useState<MonthlyReportDoc[]>([]);
@@ -41,10 +41,11 @@ export default function DataCollectionPage() {
   }, [c.companyId, c.period]);
 
   const bySector = rows.filter((r) => !sector || r.sector === sector);
+  const k = combinedKpis(bySector);
   const consented = bySector.filter((r) => r.consent);
   const list = consented.filter((r) => TABS.find((t) => t.key === tab)!.match.includes(r.reportStatus));
   const activity = reports
-    .filter((r) => (c.source === "all" || (c.source === "demo" ? r.isSimulated : !r.isSimulated)) && (!sector || r.profile.sector === sector))
+    .filter((r) => !sector || r.profile.sector === sector)
     .sort((a, b) => a.supplierId.localeCompare(b.supplierId));
 
   return (
@@ -52,17 +53,13 @@ export default function DataCollectionPage() {
       <PageTop title="Pengumpulan Data" subtitle="Progres pelaporan bulanan pemasok yang mengizinkan berbagi data"
         actions={<select aria-label="Sektor" value={sector} onChange={(e) => setSector(e.target.value)} className="h-10 rounded-xl border border-line bg-white px-3 text-sm"><option value="">Semua sektor</option>{sectors.map((s) => <option key={s}>{s}</option>)}</select>} />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis(bySector, c.source).map((k) => (
-          <Panel key={k.source} className="xl:col-span-2">
-            <div className="flex items-center justify-between"><SourceBadge source={k.source} /><span className="text-sm text-navy-500">{c.period && formatPeriod(c.period)}</span></div>
-            <p className="mt-3 text-3xl font-semibold" data-testid={`collection-rate-${k.source}`}>{pct(k.completionRate)}</p>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface"><div className="h-full rounded-full" style={{ width: `${(k.completionRate ?? 0) * 100}%`, background: k.source === "demo" ? "#6250d6" : "#eb6834" }} /></div>
-            <p className="mt-3 text-sm text-navy-700">{k.received} terkirim · {k.missing} belum mengirim · {k.draft} draf · {k.revision} perlu perbaikan</p>
-            <p className="text-xs text-navy-500">dari {k.consented} pemasok {SOURCE_LABEL[k.source].toLowerCase()} yang mengizinkan berbagi data</p>
-          </Panel>
-        ))}
-      </div>
+      <Panel>
+        <div className="flex items-center justify-between"><span className="text-sm font-medium text-navy-700">Tingkat pelaporan</span><span className="text-sm text-navy-500">{c.period && formatPeriod(c.period)}</span></div>
+        <p className="mt-3 text-3xl font-semibold" data-testid="collection-rate">{pct(k.consented ? k.received / k.consented : null)}</p>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface"><div className="h-full rounded-full bg-brand-500" style={{ width: `${k.consented ? (k.received / k.consented) * 100 : 0}%` }} /></div>
+        <p className="mt-3 text-sm text-navy-700" data-testid="collection-counts">{k.received} terkirim · {k.missing} belum mengirim · {k.draft} draf · {k.revision} perlu perbaikan</p>
+        <p className="text-xs text-navy-500">dari {k.consented} pemasok yang mengizinkan berbagi data</p>
+      </Panel>
 
       <Panel className="mt-5">
         <div role="tablist" className="mb-4 flex flex-wrap gap-2">
@@ -82,8 +79,8 @@ export default function DataCollectionPage() {
             {list.map((r) => (
               <li key={r.supplierId}>
                 <Link href={`/c/pemasok/${r.supplierId}`} className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2.5 hover:border-brand-200">
-                  <span className="min-w-0"><span className="block truncate text-sm font-medium">{r.name}</span><span className="text-xs text-navy-500">{r.supplierId} · {r.sector ?? "—"}</span></span>
-                  <span className="flex shrink-0 flex-col items-end gap-1"><SourceBadge source={r.source} /><ReportPill status={r.reportStatus} /></span>
+                  <span className="min-w-0"><span className="block truncate text-sm font-medium">{r.name}<SimTag source={r.source} /></span><span className="text-xs text-navy-500">{r.supplierId} · {r.sector ?? "—"}</span></span>
+                  <ReportPill status={r.reportStatus} />
                 </Link>
               </li>
             ))}
@@ -106,7 +103,7 @@ export default function DataCollectionPage() {
                   const a = r.activity;
                   return (
                     <tr key={r.reportId}>
-                      <td className="py-2 pr-3"><span className="font-medium">{r.profile.businessName ?? r.supplierId}</span> <span className="text-xs text-navy-500">{r.supplierId}</span> <SourceBadge source={r.isSimulated ? "demo" : "trial"} /></td>
+                      <td className="py-2 pr-3"><span className="font-medium">{r.profile.businessName ?? r.supplierId}</span> <span className="text-xs text-navy-500">{r.supplierId}</span><SimTag source={r.isSimulated ? "demo" : "trial"} /></td>
                       <td className="py-2 pr-3"><ReportPill status={r.status as RowReportStatus} /></td>
                       <td className="py-2 pr-3 text-right">{cell(a, a.electricityKwh, "listrik")}</td>
                       <td className="py-2 pr-3 text-right">{cell(a, a.fuelQuantity, "bbm")} {a.fuelQuantity != null && <span className="text-xs text-navy-500">{a.fuelUnit}{a.fuelType ? ` ${a.fuelType}` : ""}</span>}</td>

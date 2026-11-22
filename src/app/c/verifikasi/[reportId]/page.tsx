@@ -88,7 +88,6 @@ export default function ReviewPage() {
             <h1 className="text-2xl font-semibold">{r.profile.businessName ?? r.supplierId} · {formatPeriod(r.period)}</h1>
             <StatusBadge status={r.status} />
             <span className="text-xs text-navy-500">Status untuk perusahaan Anda:</span> <ReviewPill status={myStatus} source="trial" />
-            <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-info">{r.dataSource}</span>
           </div>
           <p className="mt-1 text-sm text-navy-500">{r.supplierId} · versi {r.version} · dikirim {formatDateTime(r.submittedAt)}</p>
 

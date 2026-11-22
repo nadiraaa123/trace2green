@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useCompany } from "@/components/company/CompanyContext";
 import { PageTop } from "@/components/company/Shell";
-import { EmptyNote, Panel, SourceBadge } from "@/components/company/ui";
+import { EmptyNote, Panel, SimTag } from "@/components/company/ui";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Field";
 import { auth } from "@/lib/firebase/client";
@@ -67,7 +67,7 @@ export default function SettingsPage() {
   const consent = { yes: rows.filter((r) => r.consent), no: rows.filter((r) => !r.consent) };
   return (
     <>
-      <PageTop title="Pengaturan" period={false} source={false} />
+      <PageTop title="Pengaturan" period={false} />
       {msg && <div className="mb-4 max-w-2xl"><Alert tone={msg.tone}>{msg.text}</Alert></div>}
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel title="Profil Perusahaan">
@@ -137,12 +137,12 @@ export default function SettingsPage() {
 
       <Panel title="Pemasok Terhubung & Izin Berbagi Data" subtitle="Pemasok mengatur izin sendiri; perusahaan hanya melihat statusnya" className="mt-5">
         <p className="mb-3 text-sm text-navy-700">{consent.yes.length} mengizinkan · {consent.no.length} belum mengizinkan · total {rows.length} pemasok terhubung</p>
-        {consent.no.length > 0 && (
-          <ul className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{consent.no.map((r) => (
-            <li key={r.supplierId} className="flex items-center justify-between rounded-xl border border-line px-3 py-2 text-sm"><span>{r.name} <span className="text-xs text-navy-500">{r.supplierId}</span></span><span className="text-xs text-navy-500">belum izin</span></li>
-          ))}</ul>
-        )}
-        <div className="flex flex-wrap gap-2 text-xs">{(["demo", "trial"] as const).map((s) => <span key={s} className="inline-flex items-center gap-1"><SourceBadge source={s} /> {consent.yes.filter((r) => r.source === s).length} mengizinkan</span>)}</div>
+        <ul className="grid max-h-80 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3" data-testid="consent-list">{[...consent.no, ...consent.yes].map((r) => (
+          <li key={r.supplierId} className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 text-sm">
+            <span className="min-w-0 truncate">{r.name}<SimTag source={r.source} /> <span className="text-xs text-navy-500">{r.supplierId}</span></span>
+            <span className={r.consent ? "shrink-0 text-xs text-brand-700" : "shrink-0 text-xs text-navy-500"}>{r.consent ? "mengizinkan" : "belum izin"}</span>
+          </li>
+        ))}</ul>
       </Panel>
     </>
   );

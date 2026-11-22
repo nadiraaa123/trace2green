@@ -13,8 +13,14 @@ async function login(page, email) {
   await page.getByRole("button", { name: "Masuk" }).click();
   await page.waitForURL("**/c");
 }
-// Next keeps hidden copies of visited pages; only click the visible filter button.
-const pick = (page, label) => page.locator("button:visible").filter({ hasText: new RegExp(`^${label}$`) }).first().click();
+// The source filter (Semua / Simulasi / Trial) is gone from every company page.
+async function noSourceFilter(page, where) {
+  await page.waitForTimeout(300);
+  for (const label of ["Simulasi", "Trial", "Semua"]) {
+    if (await page.locator("button:visible").filter({ hasText: new RegExp(`^${label}$`) }).count()) throw new Error(`${where}: source filter "${label}" still visible`);
+  }
+  if (await page.locator(":visible").getByText(/^Skor Rata-rata/).count()) throw new Error(`${where}: cross-source average still shown`);
+}
 const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaan" }).getByRole("link", { name }).click();
 
 (async () => {
@@ -31,18 +37,18 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   await c.getByTestId("kpi-reports").getByText(`${E.received} dari 50`).waitFor();
   await c.getByTestId("kpi-emission").getByText(`${E.tco2} ton CO₂e`).waitFor();
   await c.getByTestId("demo-note").getByText("Dashboard demonstrasi — mencakup data simulasi dan uji coba.").waitFor();
-  if (await c.getByRole("button", { name: "Simulasi", exact: true }).count()) throw new Error("dashboard must not show the source filter");
+  await noSourceFilter(c, "Ringkasan");
   if (shots) await c.screenshot({ path: `${shots}/p4-01-overview-seeded.png`, fullPage: true });
-  ok("overview renders seeded KPIs equal to the workbook (Simulasi and Trial shown separately)");
+  ok("overview renders seeded KPIs equal to the workbook in one unified view");
   await nav(c, "Emisi & Skor");
-  await c.getByTestId("avg-score-demo").getByText(`${E.avg}`).waitFor(); // averages moved here, per source
-  await c.getByTestId("avg-score-trial").getByText("—").waitFor();
+  await c.getByTestId("emission-total").getByText(`${E.tco2} tCO₂e`).waitFor(); // same total as the Ringkasan KPI
+  await noSourceFilter(c, "Emisi & Skor");
   await c.getByRole("link", { name: "Cara Penilaian" }).click();
   await c.getByTestId("example").getByText("81").waitFor();
   await c.getByTestId("disclaimer").waitFor();
   if (shots) await c.screenshot({ path: `${shots}/p5-02-cara-penilaian.png`, fullPage: true });
   await nav(c, "Ringkasan");
-  ok("simple unified KPIs + demo note on dashboard; per-source averages and scoring method on Emisi & Skor");
+  ok("unified KPIs + demo note; Emisi & Skor totals consistent, no per-source averages; scoring method tab");
 
   // 2. Suppliers directory
   await nav(c, "Pemasok");
@@ -110,22 +116,40 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   await p.getByRole("heading", { name: "Laporan terkirim" }).waitFor();
   ok("supplier submitted March 2027 from the phone");
 
-  // 5–6. Laptop: live update, Trial filter, demo untouched
+  // 5–6. Laptop: live update; the new UMKM appears in every menu next to the simulated suppliers
   await c.getByTestId("kpi-reports").getByText(`${E.received + 1} dari 51`).waitFor({ timeout: 15000 });
   await c.getByTestId("recent-activity").getByText(/Roti Rina mengirim laporan Maret 2027/).waitFor({ timeout: 15000 });
   if (shots) await c.screenshot({ path: `${shots}/p4-03-overview-live.png`, fullPage: true });
   ok("dashboard updated without refresh; simulated KPIs unchanged");
   await nav(c, "Pemasok");
   await c.getByLabel("Cari pemasok").fill(""); // the page keeps its earlier search when revisited
-  await pick(c, "Trial");
+  await c.getByText("51 pemasok · halaman 1 dari 6").waitFor(); // one list: 50 simulated + the new UMKM
+  await noSourceFilter(c, "Pemasok");
+  await c.getByLabel("Cari pemasok").fill("SUP-101");
   await c.getByText("1 pemasok · halaman 1 dari 1").waitFor();
-  await c.getByTestId("supplier-table").getByText("SUP-101").waitFor();
   await c.getByTestId("supplier-table").getByText("Menunggu Verifikasi").waitFor();
-  ok("new supplier listed under the Trial filter only");
+  if (await c.getByTestId("supplier-table").getByText("simulasi", { exact: true }).count()) throw new Error("real supplier must not carry the simulasi tag");
+  await c.getByLabel("Cari pemasok").fill("Pemasok 04");
+  await c.getByTestId("supplier-table").getByText("simulasi", { exact: true }).first().waitFor(); // simulated rows stay labeled
+  ok("Pemasok: new UMKM in the same list as simulated suppliers (no filter switch); simulated rows tagged");
   await nav(c, "Pengumpulan Data");
+  await c.getByTestId("collection-counts").getByText(`${E.received + 1} terkirim`, { exact: false }).waitFor();
   await c.getByTestId("activity-table").getByText("Roti Rina").waitFor();
   await c.getByTestId("activity-table").getByText("0*").waitFor(); // declared not used
-  ok("activity table shows the live report; 'tidak memakai' rendered as genuine zero");
+  await noSourceFilter(c, "Pengumpulan Data");
+  ok("Pengumpulan: one combined rate counts the new report; activity table shows it; 'tidak memakai' = genuine zero");
+  await c.goto(BASE + "/c/laporan");
+  await c.getByText("Roti Rina").first().waitFor();
+  await noSourceFilter(c, "Laporan");
+  await c.goto(BASE + "/c/insight");
+  await c.getByTestId("follow-ups").getByText("Roti Rina").waitFor(); // pending review → follow-up
+  await noSourceFilter(c, "Insight");
+  await c.goto(BASE + "/c/pengaturan");
+  await c.getByTestId("consent-list").getByText("Roti Rina").waitFor();
+  await c.goto(BASE + "/c/emisi-skor");
+  await c.getByTestId("intensity-table").waitFor();
+  await noSourceFilter(c, "Emisi & Skor");
+  ok("Laporan, Insight & Rekomendasi, Pengaturan and Emisi & Skor include the new UMKM without any source filter");
 
   // 7. Company B sees nothing of it
   const lapB = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -170,8 +194,7 @@ const nav = (page, name) => page.getByRole("navigation", { name: "Menu perusahaa
   await c.getByTestId("verification-summary").locator("div", { hasText: "Terverifikasi" }).getByText("1", { exact: true }).waitFor({ timeout: 15000 });
   // Fresh page loads (no hidden copies of earlier pages kept by the client router).
   await c.goto(BASE + "/c/emisi-skor");
-  await pick(c, "Semua"); // the Trial filter chosen earlier persists on detail pages
-  await c.getByTestId("avg-score-demo").getByText(`${E.avg}`).waitFor(); // simulated average unchanged
+  await c.getByTestId("emission-status").getByText(/laporan simulasi \(nilai workbook\)/).waitFor(); // simulated data intact
   await c.goto(BASE + "/c/pemasok/SUP-101");
   await c.getByRole("link", { name: "Rincian skor" }).click();
   await c.getByTestId("components").getByText("Kecocokan Bukti").waitFor();

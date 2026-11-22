@@ -1,23 +1,18 @@
 "use client";
 import { collection, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
-import { AlertTriangle, ChevronRight, ClipboardCheck, Cloud, FileText, Info, Users } from "lucide-react";
+import { AlertTriangle, ChevronRight, ClipboardCheck, Cloud, FileText, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useCompany } from "@/components/company/CompanyContext";
 import { EmissionBars, ScoreDonut, TrendChart } from "@/components/company/charts";
 import { PageTop } from "@/components/company/Shell";
-import { EmptyNote, Panel, ReportPill, StatCard, fmt } from "@/components/company/ui";
+import { EmptyNote, Panel, ReportPill, SimTag, StatCard, fmt } from "@/components/company/ui";
 import { db } from "@/lib/firebase/client";
-import { attentionReasons, combinedCompletionTrend, combinedKpis, type StatsRow } from "@/lib/kpi";
+import { attentionReasons, combinedCompletionTrend, combinedKpis } from "@/lib/kpi";
 import { formatPeriod, shortPeriod } from "@/lib/period";
 import { formatDateTime } from "@/lib/supplier-data";
 
 interface Submission { reportId: string; supplierId: string; action: string; createdAt: unknown }
-
-/** Small, unobtrusive marker so simulated records are never mistaken for real customers. */
-function SimTag({ row }: { row: Pick<StatsRow, "source"> }) {
-  return row.source === "demo" ? <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">simulasi</span> : null;
-}
 
 export default function OverviewPage() {
   const c = useCompany();
@@ -44,17 +39,12 @@ export default function OverviewPage() {
 
   if (c.loading) return <div className="h-96 animate-pulse rounded-2xl bg-white" />;
   if (!c.current) {
-    return (<><PageTop title="Ringkasan" source={false} /><EmptyNote>Belum ada data. Hubungkan pemasok atau impor data contoh.</EmptyNote></>);
+    return (<><PageTop title="Ringkasan" /><EmptyNote>Belum ada data. Hubungkan pemasok atau impor data contoh.</EmptyNote></>);
   }
 
   return (
     <>
-      <PageTop title="Ringkasan" subtitle={`${c.company?.name ?? c.companyId} · ${formatPeriod(c.period!)}`} source={false} />
-      {k.hasDemo && (
-        <p className="-mt-3 mb-5 inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-800" data-testid="demo-note">
-          <Info className="size-3.5" /> Dashboard demonstrasi — mencakup data simulasi dan uji coba.
-        </p>
-      )}
+      <PageTop title="Ringkasan" subtitle={`${c.company?.name ?? c.companyId} · ${formatPeriod(c.period!)}`} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard testId="kpi-suppliers" icon={Users} label="Total Pemasok" value={fmt(k.related)} hint="pemasok terhubung" />
@@ -85,7 +75,7 @@ export default function OverviewPage() {
                   <Link href={`/c/pemasok/${r.supplierId}`} className="flex items-center gap-3 py-2.5">
                     <AlertTriangle className="size-4 shrink-0 text-amber-600" />
                     <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 truncate text-sm font-medium">{r.name} <SimTag row={r} /></p>
+                      <p className="flex items-center gap-1.5 truncate text-sm font-medium">{r.name}<SimTag source={r.source} /></p>
                       <p className="truncate text-xs text-navy-500">{reasons.join(" · ")}</p>
                     </div>
                   </Link>

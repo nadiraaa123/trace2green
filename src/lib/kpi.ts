@@ -1,8 +1,9 @@
 // Company dashboard KPIs (pure). One row per related supplier per period lives in
 // the server-maintained summary doc company_period_stats/{companyId}_{period}.
 // Rules:
-// - Simulated (demo) and trial rows are NEVER averaged together. "Semua" returns
-//   both groups side by side.
+// - The company portal shows ONE unified view (combinedKpis). Only additive counts
+//   and totals are combined; scores are never averaged across simulated (workbook)
+//   and trial (engine) methodologies.
 // - Missing data stays missing: averages state their n and what was excluded.
 // - Nothing here invents values; every number is derived from the rows.
 import type { ActivityCategory } from "./types";
@@ -176,6 +177,14 @@ export interface CombinedKpis {
   related: number; consented: number; expected: number; received: number; attention: number;
   emissionsKg: number; byCategory: Record<ActivityCategory, number>;
   colors: { HIJAU: number; KUNING: number; MERAH: number; none: number };
+  missing: number; draft: number; revision: number;
+  /** Emission totals by how they were obtained (counts are additive). */
+  emissionStatus: { workbook: number; complete: number; partial: number; unavailable: number };
+  evidence: { match: number; mismatch: number; unverifiable: number };
+  /** Received reports by completeness band (counts, not an average). */
+  completeness: { full: number; partial: number; low: number; unknown: number };
+  /** In-app (non-simulated) received reports and how many this company verified. */
+  appReceived: number; verified: number;
   hasDemo: boolean; hasTrial: boolean;
 }
 
@@ -188,9 +197,33 @@ export function combinedKpis(rows: StatsRow[]): CombinedKpis {
     received: d.received + t.received, attention: d.attention + t.attention,
     emissionsKg: d.emissions.totalKg + t.emissions.totalKg, byCategory,
     colors: { HIJAU: d.colors.HIJAU + t.colors.HIJAU, KUNING: d.colors.KUNING + t.colors.KUNING, MERAH: d.colors.MERAH + t.colors.MERAH, none: d.colors.none + t.colors.none },
+    missing: d.missing + t.missing, draft: d.draft + t.draft, revision: d.revision + t.revision,
+    emissionStatus: {
+      workbook: d.emissions.workbook + t.emissions.workbook, complete: d.emissions.complete + t.emissions.complete,
+      partial: d.emissions.partial + t.emissions.partial, unavailable: d.emissions.unavailable + t.emissions.unavailable,
+    },
+    evidence: { match: d.evidence.match + t.evidence.match, mismatch: d.evidence.mismatch + t.evidence.mismatch, unverifiable: d.evidence.unverifiable + t.evidence.unverifiable },
+    completeness: completenessBands(rows),
+    appReceived: t.received, verified: t.review.verified,
     hasDemo: d.related > 0, hasTrial: t.related > 0,
   };
 }
+
+/** Received reports bucketed by completeness: 100%, 60–99%, < 60% (the MERAH rule), unknown. */
+export function completenessBands(rows: StatsRow[]) {
+  const out = { full: 0, partial: 0, low: 0, unknown: 0 };
+  for (const r of rows) {
+    if (!r.consent || !RECEIVED.includes(r.reportStatus)) continue;
+    if (r.completeness == null) out.unknown++;
+    else if (r.completeness >= 1) out.full++;
+    else if (r.completeness >= 0.6) out.partial++;
+    else out.low++;
+  }
+  return out;
+}
+
+/** Received reports (consented) — the unified list used by every company page. */
+export const receivedRows = (rows: StatsRow[]) => rows.filter((r) => r.consent && RECEIVED.includes(r.reportStatus));
 
 /**
  * Share of suppliers that sent a report, per period, across sources — each source

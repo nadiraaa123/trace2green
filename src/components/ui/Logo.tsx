@@ -1,7 +1,7 @@
 import Image from "next/image";
 import mark from "../../../public/brand/trace2green-mark-512.png";
 
-/** Trace2Green brand mark: the supplied logo image, unaltered (cropped to the symbol, square, not redrawn). */
+/** Trace2Green brand mark: the supplied circular logo (with its own border), cropped to the circle, not redrawn. */
 export function LogoMark({ className = "size-8" }: { className?: string }) {
   return <Image src={mark} alt="" aria-hidden="true" priority sizes="64px" className={`${className} shrink-0 object-contain`} />;
 }

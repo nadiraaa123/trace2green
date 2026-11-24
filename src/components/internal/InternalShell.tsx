@@ -20,7 +20,7 @@ export function InternalShell({ nav, workspace, children }: { nav: NavItem[]; wo
     <div className="min-h-dvh bg-surface lg:pl-64">
       <aside className={clsx("fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-navy-900 py-5 transition-transform lg:translate-x-0", open ? "translate-x-0" : "-translate-x-full")}>
         <div className="mb-2 flex items-center justify-between px-6">
-          <span className="inline-flex items-center gap-2 text-lg font-semibold text-white"><span className="rounded-lg bg-white p-0.5"><LogoMark className="size-8 rounded-md" /></span> trace2green</span>
+          <span className="inline-flex items-center gap-2 text-lg font-semibold text-white"><LogoMark className="size-10" /> trace2green</span>
           <button className="text-white/80 lg:hidden" onClick={() => setOpen(false)} aria-label="Tutup menu"><X className="size-5" /></button>
         </div>
         <p className="mb-5 px-6 text-[11px] font-semibold uppercase tracking-wider text-white/50">{workspace} · internal</p>

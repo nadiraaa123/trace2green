@@ -4,6 +4,7 @@
  *   npx tsx scripts/scenario.ts --offline             # plan only, no database
  *   npx tsx scripts/scenario.ts                       # dry run: diff against the target database (read-only)
  *   SCENARIO_CS_PASSWORD=... npx tsx scripts/scenario.ts --apply --confirm-project <projectId>
+ *   SCENARIO_CS_PASSWORD=... npx tsx scripts/scenario.ts --reset-cs-password --confirm-project <projectId>
  *
  * Writes ONLY: meta/financial_scenario, scenario_companies/*, scenario_suppliers/*, cs_staff/CS-S*,
  * and 13 CS demo accounts. Create-only: existing docs are never overwritten. No reports, payments or contracts.
@@ -40,6 +41,24 @@ async function main() {
   console.log("Akun CS:", d.csAccounts.map((a) => `${a.csId}:${a.action}${a.detail ? `(${a.detail})` : ""}`).join(" "));
   console.log("Data yang dipertahankan (tidak diubah):", JSON.stringify(d.preserved));
 
+  if (args.includes("--reset-cs-password")) {
+    const confirm = args[args.indexOf("--confirm-project") + 1];
+    if (!args.includes("--confirm-project") || confirm !== targetProjectId) throw new Error(`Tolak: --confirm-project harus sama dengan project target (${targetProjectId}).`);
+    const pw = process.env.SCENARIO_CS_PASSWORD ?? "";
+    if (pw.length < 10) throw new Error("SCENARIO_CS_PASSWORD minimal 10 karakter");
+    const plan = buildScenarioPlan();
+    let n = 0;
+    for (const c of plan.cs) {
+      const u = await auth.getUserByEmail(c.email);
+      if (u.customClaims?.role !== "customer_success" || u.customClaims?.scenario !== true || u.customClaims?.csId !== c.csId) {
+        console.log(`Lewati ${c.email}: bukan akun CS skenario`); continue;
+      }
+      await auth.updateUser(u.uid, { password: pw });
+      n++;
+    }
+    console.log(`\nPassword diganti untuk ${n} akun CS skenario.`);
+    return;
+  }
   if (!args.includes("--apply")) { console.log("\nDRY RUN — tidak ada yang ditulis."); return; }
   const confirm = args[args.indexOf("--confirm-project") + 1];
   if (!args.includes("--confirm-project") || confirm !== targetProjectId) {

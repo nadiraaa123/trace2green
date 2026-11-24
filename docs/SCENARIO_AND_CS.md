@@ -14,6 +14,13 @@ Scenario IDs cannot collide with `SUP-###` (workbook + live registrations from t
 Why separate: the workbook has 90–94 suppliers reporting per month in Jan–Mar 2027, five times the
 financial model's trial quota (10 per new company → 20 in 2027), so it cannot represent the 2027 commercial scenario.
 
+## Operational simulation (not all-success)
+The financial model assumes 100% conversion and 0% churn. `src/lib/opsSim.ts` adds a deterministic,
+read-only simulation per scenario supplier and month (registration, trial outcome, on-time/late/failed
+activation, monthly reporting, needs-help flags, annual renewal) from ILLUSTRATIVE rates in `OPS_SIM_RATES`.
+Nothing is written to Firestore. Scenario CS accounts see this on their home page; Platform Admin › Skenario
+shows target vs simulated realization (e.g. 2031: 880 target vs ~671 simulated). Change rates in one place.
+
 ## Rules enforced server-side
 - One primary CS per supplier (`cs_assignments/{supplierId}`), max 70 unique suppliers per CS; scenario CS cannot take real suppliers.
 - Trial: only companies with a trial plan (`company_subscriptions.isNewCompany` + `trialYear`), Jan–Mar, max 10 unique suppliers per company for the whole window.

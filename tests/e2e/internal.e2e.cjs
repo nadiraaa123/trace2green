@@ -114,16 +114,30 @@ const nav = (page, menu, name) => page.getByRole("navigation", { name: menu }).g
   await co.waitForURL("**/c");
   ok("CS cannot open admin; company admin cannot open CS or admin workspaces");
 
-  // 6. Scenario CS account: projection portfolio only
+  // 6. Scenario CS account: simulated portfolio on its home page (not all-success), projection on its own tab
   const s = await (await ctx()).newPage();
   process.env.PW = "rahasia-demo-123";
-  await login(s, "cs13@scenario.trace2green.test", "/cs");
-  await s.getByText("Belum ada pemasok yang ditugaskan kepada Anda", { exact: false }).waitFor(); // no real suppliers
-  await nav(s, "Menu Customer Success", "Skenario 2027–2031");
-  await s.getByText("Pemasok proyeksi 2031: 40 / 70").waitFor();
-  await s.getByLabel("Tahun skenario").selectOption("2030");
-  await s.getByText("Belum ada pemasok proyeksi pada 2030", { exact: false }).waitFor();
-  ok("scenario CS-S13: 40 projected suppliers in 2031, none before; no real portfolio");
+  await login(s, "cs01@scenario.trace2green.test", "/cs");
+  await s.getByTestId("sim-note").waitFor();
+  await s.getByLabel("Tahun").selectOption("2027");
+  await s.getByLabel("Bulan").selectOption("2");
+  await s.getByTestId("cs-capacity").getByText("40 / 70").waitFor(); // 2027 cohort: 40 assigned
+  const help = Number(await s.getByTestId("cs-help").locator("p.text-3xl").innerText());
+  const noRep = await s.getByTestId("cs-noreport").locator("p.text-3xl").innerText();
+  if (!(help > 0) || noRep === "0") throw new Error(`simulation must not be all-success (help=${help}, noReport=${noRep})`);
+  await s.getByLabel("Bulan").selectOption("4");
+  await s.getByTestId("cs-table").getByText("Kedaluwarsa / Tidak Aktif").first().waitFor(); // some trials/activations fail
+  await s.getByTestId("cs-table").locator("tbody tr").first().click();
+  await s.getByTestId("sim-detail").waitFor();
+  if (shots) await s.screenshot({ path: `${shots}/i-04-cs-scenario-sim.png`, fullPage: true });
+  await nav(s, "Menu Customer Success", "Proyeksi Model 2027–2031");
+  await s.getByText("Pemasok proyeksi 2031: 70 / 70").waitFor();
+  ok("scenario CS-S01: simulated portfolio with help/no-report/failed outcomes; model projection separate");
+
+  await a.goto(BASE + "/admin/skenario");
+  await a.getByTestId("target-vs-sim").locator("tr", { hasText: "2031" }).getByText("880").waitFor();
+  await a.getByTestId("sim-rates").getByText("(ilustrasi)").first().waitFor();
+  ok("admin: target vs simulated realization per year with illustrative rates");
 
   await browser.close();
   console.log("ALL INTERNAL E2E CHECKS PASSED");

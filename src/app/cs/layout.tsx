@@ -5,7 +5,7 @@ import { InternalShell } from "@/components/internal/InternalShell";
 
 const NAV = [
   { href: "/cs", label: "Portofolio Saya", icon: LayoutDashboard, exact: true },
-  { href: "/cs/skenario", label: "Skenario 2027–2031", icon: CalendarRange },
+  { href: "/cs/skenario", label: "Proyeksi Model 2027–2031", icon: CalendarRange },
 ];
 
 export default function CsLayout({ children }: { children: React.ReactNode }) {

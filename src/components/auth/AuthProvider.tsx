@@ -11,6 +11,8 @@ export interface Claims {
   companyId: string | null;
   csId: string | null;
   canVerify: boolean;
+  /** Scenario (demo) CS account: its portfolio is the simulated 2027–2031 scenario. */
+  scenario: boolean;
 }
 
 interface AuthState {
@@ -22,7 +24,7 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
-const empty: Claims = { role: null, supplierId: null, companyId: null, csId: null, canVerify: false };
+const empty: Claims = { role: null, supplierId: null, companyId: null, csId: null, canVerify: false, scenario: false };
 const Ctx = createContext<AuthState | null>(null);
 
 function pick(c: Record<string, unknown>): Claims {
@@ -32,6 +34,7 @@ function pick(c: Record<string, unknown>): Claims {
     companyId: (c.companyId as string) ?? null,
     csId: (c.csId as string) ?? null,
     canVerify: c.canVerify === true,
+    scenario: c.scenario === true,
   };
 }
 

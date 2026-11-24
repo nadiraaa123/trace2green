@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EmptyNote, Panel, StatCard } from "@/components/company/ui";
 import { InternalTop } from "@/components/internal/InternalShell";
+import { ScenarioCsDashboard } from "@/components/internal/ScenarioCsDashboard";
 import { LifecycleDetail, needsHelp, StagePill, type LifecycleRow } from "@/components/internal/lifecycle";
 import { Button } from "@/components/ui/Button";
 import { Pagination, usePaged } from "@/components/ui/Pagination";
@@ -16,7 +17,13 @@ import { CS_CAPACITY } from "@/lib/scenario";
 
 interface FollowUp { id: string; supplierId: string; supplierName: string | null; companyId: string; note: string; dueDate: string | null; done: boolean }
 
+/** Scenario CS accounts get the simulated scenario portfolio; real CS staff get operational records. */
 export default function CsPortfolioPage() {
+  const { claims } = useAuth();
+  return claims.scenario ? <ScenarioCsDashboard /> : <OperationalPortfolio />;
+}
+
+function OperationalPortfolio() {
   const { claims } = useAuth();
   const csId = claims.csId;
   const [rows, setRows] = useState<LifecycleRow[] | null>(null);

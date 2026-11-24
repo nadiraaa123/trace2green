@@ -21,13 +21,32 @@ financial model's trial quota (10 per new company → 20 in 2027), so it cannot 
 - A supplier whose every lifecycle record is `expired` cannot submit reports; history and reports are kept.
 - Firestore rules: CS reads only docs with its own `csId`; company admins and suppliers have no access to internal collections.
 
+## Target project (competition setup)
+Trace2Green is a competition project, so the scenario layer lives in the **same Firebase project as the app
+(`trace2green`)**, next to the analytical dataset. They stay distinguishable by ID prefix (`SCN-`, `CS-S`),
+`basis: "scenario_projection"`, `isProjection: true`, and the "proyeksi" labels in the UI. A separate pilot
+project is only needed if the platform is later used with real customers.
+
 ## Commands
 ```bash
 npx tsx scripts/provision.ts platform-admin <email> <password>
 npx tsx scripts/provision.ts customer-success CS-001 "Name" <email> <password>
 npx tsx scripts/scenario.ts --offline     # plan only
 npx tsx scripts/scenario.ts               # dry run against the target DB (read-only)
-SCENARIO_CS_PASSWORD=... npx tsx scripts/scenario.ts --apply --confirm-project <projectId>
 ```
+
+### Apply on Windows (Git Bash), same terminal/env as the dry run
+```bash
+export SCENARIO_CS_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=')"   # ~30 random chars, not printed
+printf %s "$SCENARIO_CS_PASSWORD" | clip                               # copy → paste into a password manager now
+npx tsx scripts/scenario.ts --apply --confirm-project trace2green
+unset SCENARIO_CS_PASSWORD
+npx tsx scripts/scenario.ts                                            # verify: 0 to create, 910 unchanged, 0 conflicts
+```
+All 13 scenario CS accounts (`cs01…cs13@scenario.trace2green.test`) share that password; they are demo accounts only.
 The apply step is create-only and idempotent: existing docs are skipped; a differing doc is reported as a conflict and not overwritten.
-Deploy `firestore.rules` and `firestore.indexes.json` (new composite indexes for lifecycle/scenario paging) before use.
+
+Deploy rules and indexes (new composite indexes for lifecycle/scenario paging) before using the Admin/CS menus:
+```bash
+npx firebase deploy --only firestore:rules,firestore:indexes --project trace2green
+```

@@ -11,7 +11,7 @@
     "emulators": "firebase emulators:start --project demo-trace2green --only firestore,auth",
     "provision": "tsx scripts/provision.ts",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:e2e": "NEXT_PUBLIC_REPORTING_REFERENCE_DATE=2027-04-05 next build && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run.sh && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-phase3.sh && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-phase4.sh",
+    "test:e2e": "NEXT_PUBLIC_REPORTING_REFERENCE_DATE=2027-04-05 next build && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run.sh && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-phase3.sh && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-phase4.sh && firebase emulators:exec --project demo-trace2green --only firestore,auth tests/e2e/run-internal.sh",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

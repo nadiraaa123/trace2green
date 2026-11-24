@@ -1,7 +1,7 @@
 // Shared Firestore schema types. See docs/ARCHITECTURE.md §2.
 
 export type DataSource = "demo" | "trial" | "production";
-export type Role = "supplier" | "company_admin" | "platform_admin";
+export type Role = "supplier" | "company_admin" | "customer_success" | "platform_admin";
 
 export type ReportStatus =
   | "draft"

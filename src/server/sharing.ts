@@ -2,6 +2,7 @@
 // sharedWith on report-family docs is derived ONLY from consent records here.
 import { FieldValue, type Firestore, Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
+import { ensureLifecycleOnConnect } from "./lifecycle";
 import { recomputeAfterSharingChange } from "./stats";
 import { AppError, hashInvite } from "./suppliers";
 
@@ -120,7 +121,7 @@ export async function connectWithInvite(db: Firestore, caller: Caller, input: z.
   const inviteRef = db.doc(`supplier_invites/${hashInvite(input.inviteCode)}`);
   const supplierRef = db.doc(`suppliers/${supplierId}`);
 
-  const { companyId, companyName } = await db.runTransaction(async (tx) => {
+  const { companyId, companyName, supplierName } = await db.runTransaction(async (tx) => {
     const [inv, sup] = await Promise.all([tx.get(inviteRef), tx.get(supplierRef)]);
     if (!inv.exists) throw new AppError("invite_invalid", "Kode tidak ditemukan.", 404);
     const invite = inv.data()!;
@@ -150,7 +151,7 @@ export async function connectWithInvite(db: Firestore, caller: Caller, input: z.
     tx.create(db.collection("audit_logs").doc(), {
       actorUid: caller.uid, action: "supplier.connect", target: relRef.path, shareData: input.shareData, createdAt: now,
     });
-    return { companyId: invite.companyId as string, companyName: (invite.companyName as string) ?? invite.companyId };
+    return { companyId: invite.companyId as string, companyName: (invite.companyName as string) ?? invite.companyId, supplierName: (sup.data()!.businessName as string) ?? supplierId };
   });
 
   if (input.shareData) {
@@ -158,5 +159,6 @@ export async function connectWithInvite(db: Firestore, caller: Caller, input: z.
     await db.doc(`supplier_data_sharing_consents/${companyId}_${supplierId}`).update({ propagation: "done" });
   }
   await recomputeAfterSharingChange(db, companyId);
+  await ensureLifecycleOnConnect(db, companyId, companyName, supplierId, supplierName); // CS onboarding record (create-only)
   return { companyId, companyName, shared: input.shareData };
 }

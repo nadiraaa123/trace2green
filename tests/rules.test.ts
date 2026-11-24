@@ -307,3 +307,70 @@ describe("Phase 5: Google Sheets sync status and logs", () => {
     await assertFails(getDoc(doc(companyA(), "sync_logs/l1")));
   });
 });
+
+describe("Customer Success, lifecycle and scenario isolation", () => {
+  const cs1 = () => env.authenticatedContext("c1", { role: "customer_success", csId: "CS01" }).firestore();
+  const cs2 = () => env.authenticatedContext("c2", { role: "customer_success", csId: "CS02" }).firestore();
+  const admin = () => env.authenticatedContext("pa", { role: "platform_admin" }).firestore();
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "cs_staff/CS01"), { csId: "CS01", name: "CS 1" });
+      await setDoc(doc(db, "cs_staff/CS02"), { csId: "CS02", name: "CS 2" });
+      await setDoc(doc(db, "cs_assignments/SUP-101"), { supplierId: "SUP-101", csId: "CS01" });
+      await setDoc(doc(db, "supplier_lifecycle/CMP-A_SUP-101"), { companyId: "CMP-A", supplierId: "SUP-101", csId: "CS01", stage: "onboarding" });
+      await setDoc(doc(db, "supplier_lifecycle/CMP-A_SUP-101/history/h1"), { from: "onboarding", to: "trial" });
+      await setDoc(doc(db, "supplier_lifecycle/CMP-B_SUP-102"), { companyId: "CMP-B", supplierId: "SUP-102", csId: "CS02", stage: "trial" });
+      await setDoc(doc(db, "cs_followups/f1"), { supplierId: "SUP-101", csId: "CS01", note: "telepon" });
+      await setDoc(doc(db, "company_subscriptions/CMP-A"), { companyId: "CMP-A", status: "trial" });
+      await setDoc(doc(db, "scenario_suppliers/SCN-S0001"), { supplierId: "SCN-S0001", csId: "CS01" });
+      await setDoc(doc(db, "scenario_suppliers/SCN-S0071"), { supplierId: "SCN-S0071", csId: "CS02" });
+      await setDoc(doc(db, "scenario_companies/SCN-C01"), { companyId: "SCN-C01" });
+      await setDoc(doc(db, "meta/financial_scenario"), { version: 1 });
+    });
+  });
+
+  it("CS reads only its own portfolio", async () => {
+    await assertSucceeds(getDoc(doc(cs1(), "supplier_lifecycle/CMP-A_SUP-101")));
+    await assertSucceeds(getDocs(query(collection(cs1(), "supplier_lifecycle"), where("csId", "==", "CS01"))));
+    await assertSucceeds(getDoc(doc(cs1(), "supplier_lifecycle/CMP-A_SUP-101/history/h1")));
+    await assertSucceeds(getDoc(doc(cs1(), "cs_followups/f1")));
+    await assertSucceeds(getDoc(doc(cs1(), "cs_staff/CS01")));
+    await assertSucceeds(getDocs(query(collection(cs1(), "scenario_suppliers"), where("csId", "==", "CS01"))));
+  });
+  it("CS cannot read other portfolios, the CS directory, or list without its own filter", async () => {
+    await assertFails(getDoc(doc(cs1(), "supplier_lifecycle/CMP-B_SUP-102")));
+    await assertFails(getDocs(collection(cs1(), "supplier_lifecycle")));
+    await assertFails(getDocs(query(collection(cs1(), "supplier_lifecycle"), where("csId", "==", "CS02"))));
+    await assertFails(getDoc(doc(cs1(), "cs_staff/CS02")));
+    await assertFails(getDocs(collection(cs1(), "cs_staff")));
+    await assertFails(getDoc(doc(cs2(), "cs_followups/f1")));
+    await assertFails(getDoc(doc(cs1(), "scenario_suppliers/SCN-S0071")));
+    await assertFails(getDoc(doc(cs1(), "company_subscriptions/CMP-A")));
+    await assertFails(getDoc(doc(cs1(), "meta/financial_scenario")));
+  });
+  it("CS gets no company or supplier report access", async () => {
+    await assertFails(getDoc(doc(cs1(), "monthly_reports/SUP-001_2027-01")));
+    await assertFails(getDoc(doc(cs1(), "suppliers/SUP-001")));
+    await assertFails(getDoc(doc(cs1(), "companies/CMP-A")));
+  });
+  it("company admins and suppliers get no internal CS/lifecycle/scenario access", async () => {
+    for (const f of [companyA, sup1]) {
+      await assertFails(getDoc(doc(f(), "supplier_lifecycle/CMP-A_SUP-101")));
+      await assertFails(getDoc(doc(f(), "cs_assignments/SUP-101")));
+      await assertFails(getDoc(doc(f(), "cs_followups/f1")));
+      await assertFails(getDoc(doc(f(), "company_subscriptions/CMP-A")));
+      await assertFails(getDoc(doc(f(), "scenario_suppliers/SCN-S0001")));
+      await assertFails(getDocs(collection(f(), "scenario_companies")));
+    }
+  });
+  it("nobody writes internal collections from the client; platform admin reads all", async () => {
+    await assertFails(setDoc(doc(cs1(), "cs_assignments/SUP-102"), { supplierId: "SUP-102", csId: "CS01" }));
+    await assertFails(updateDoc(doc(cs1(), "supplier_lifecycle/CMP-A_SUP-101"), { stage: "active_subscription" }));
+    await assertFails(setDoc(doc(admin(), "company_subscriptions/CMP-A"), { status: "renewed" }));
+    await assertSucceeds(getDocs(collection(admin(), "supplier_lifecycle")));
+    await assertSucceeds(getDocs(collection(admin(), "cs_staff")));
+    await assertSucceeds(getDocs(collection(admin(), "scenario_suppliers")));
+    await assertSucceeds(getDoc(doc(admin(), "meta/financial_scenario")));
+  });
+});

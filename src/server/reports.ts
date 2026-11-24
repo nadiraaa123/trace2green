@@ -6,6 +6,7 @@ import { isReportable, referenceDate } from "@/lib/period";
 import { missingItems, submitBlockers } from "@/lib/report";
 import type { ReportStatus } from "@/lib/types";
 import { calculate, loadReferenceData, writeBaseCalculation } from "./calculation";
+import { assertSubscriptionAccess, recordReportOnLifecycle } from "./lifecycle";
 import { recomputeAfterReportChange } from "./stats";
 import { grantedCompanies, requireSupplier } from "./sharing";
 import { AppError } from "./suppliers";
@@ -54,6 +55,7 @@ export async function submitReport(db: Firestore, caller: Caller, period: string
   const reportRef = db.doc(`monthly_reports/${rid}`);
   // Consents are read outside the transaction; a consent change concurrently
   // re-propagates sharedWith over all docs, so the end state stays consistent.
+  await assertSubscriptionAccess(db, supplierId); // expired subscriptions cannot submit
   const sharedWith = await grantedCompanies(db, supplierId);
   const refData = await loadReferenceData(db);
 
@@ -127,6 +129,7 @@ export async function submitReport(db: Firestore, caller: Caller, period: string
     return { reportId: rid, version, status: "submitted" as const, sharedWith, missingFields: missing };
   });
   await recomputeAfterReportChange(db, supplierId, period);
+  await recordReportOnLifecycle(db, supplierId, period);
   return result;
 }
 

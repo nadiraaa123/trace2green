@@ -4,6 +4,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 const projectId = process.env.FIREBASE_PROJECT_ID || "demo-trace2green";
+let resolvedProjectId = projectId;
 if (!getApps().length) {
   if (process.env.FIRESTORE_EMULATOR_HOST) {
     initializeApp({ projectId });
@@ -12,8 +13,11 @@ if (!getApps().length) {
     if (!raw) throw new Error("Set FIRESTORE_EMULATOR_HOST or FIREBASE_SERVICE_ACCOUNT_KEY");
     const json = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
     initializeApp({ credential: cert(json), projectId: json.project_id });
+    resolvedProjectId = json.project_id;
   }
 }
 export const db = getFirestore();
 export const auth = getAuth();
+/** The Firebase project the script will actually write to. */
+export const targetProjectId = resolvedProjectId;
 export const target = process.env.FIRESTORE_EMULATOR_HOST ? `emulator (${projectId})` : `PRODUCTION project`;

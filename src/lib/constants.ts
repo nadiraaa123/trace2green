@@ -12,6 +12,7 @@ export const formatSupplierId = (n: number) =>
 export const ROLE_HOME: Record<Role, string> = {
   supplier: "/s",
   company_admin: "/c",
+  customer_success: "/cs",
   platform_admin: "/admin",
 };
 
